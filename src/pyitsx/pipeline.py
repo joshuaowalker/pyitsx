@@ -17,7 +17,7 @@ from pyitsx.regions import extract_regions
 def orient(
     sequences: SequenceInput,
     db: ProfileDB,
-    cpus: int = 0,
+    cpus: int = 1,
 ) -> list[OrientResult]:
     seqs = db.prepare(sequences)
     hits_by_seq = db.search(seqs, cpus=cpus)
@@ -32,7 +32,7 @@ def orient(
 def classify(
     sequences: SequenceInput,
     db: ProfileDB,
-    cpus: int = 0,
+    cpus: int = 1,
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
 ) -> list[ClassifyResult]:
     seqs = db.prepare(sequences)
@@ -62,7 +62,7 @@ def classify(
 def delimit(
     sequences: SequenceInput,
     db: ProfileDB,
-    cpus: int = 0,
+    cpus: int = 1,
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
 ) -> list[DelimitResult]:
     seqs = db.prepare(sequences)

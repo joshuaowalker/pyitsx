@@ -112,7 +112,7 @@ class ProfileDB:
     def search(
         self,
         sequences: pyhmmer.easel.DigitalSequenceBlock,
-        cpus: int = 0,
+        cpus: int = 1,
     ) -> dict[str, list[AnchorHit]]:
         hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
 
