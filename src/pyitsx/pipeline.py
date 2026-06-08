@@ -1,10 +1,7 @@
 from collections import defaultdict
-from typing import Iterable, Union
-
-import pyhmmer.easel
 
 from pyitsx.chains import build_chain
-from pyitsx.constants import AnchorType, Confidence, Strand
+from pyitsx.constants import Confidence, Region, Strand
 from pyitsx.models import (
     AnchorHit,
     ChainConstraints,
@@ -13,24 +10,81 @@ from pyitsx.models import (
     DelimitResult,
     OrientResult,
 )
-from pyitsx.profiles import ProfileDB
+from pyitsx.profiles import ProfileDB, SequenceInput
 from pyitsx.regions import extract_regions
 
 
 def orient(
-    sequences: Union[
-        pyhmmer.easel.DigitalSequenceBlock,
-        Iterable[pyhmmer.easel.DigitalSequence],
-    ],
+    sequences: SequenceInput,
     db: ProfileDB,
     cpus: int = 0,
 ) -> list[OrientResult]:
-    hits_by_seq = db.search(sequences, cpus=cpus)
+    seqs = db.prepare(sequences)
+    hits_by_seq = db.search(seqs, cpus=cpus)
     results = []
     for seq_id, hits in hits_by_seq.items():
         result = _orient_from_hits(seq_id, hits)
         if result is not None:
             results.append(result)
+    return results
+
+
+def classify(
+    sequences: SequenceInput,
+    db: ProfileDB,
+    cpus: int = 0,
+    constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
+) -> list[ClassifyResult]:
+    seqs = db.prepare(sequences)
+    seq_lengths = {s.name: len(s) for s in seqs}
+    hits_by_seq = db.search(seqs, cpus=cpus)
+    results = []
+    for seq_id, hits in hits_by_seq.items():
+        chain = build_chain(hits, constraints)
+        if chain is None:
+            continue
+        seq_length = seq_lengths.get(seq_id, 0)
+        bounds = extract_regions(chain, seq_length)
+        region_set = {b.region for b in bounds}
+        results.append(
+            ClassifyResult(
+                seq_id=seq_id,
+                strand=chain.strand,
+                has_its1=Region.ITS1 in region_set,
+                has_its2=Region.ITS2 in region_set,
+                confidence=chain.confidence,
+                chain=chain,
+            )
+        )
+    return results
+
+
+def delimit(
+    sequences: SequenceInput,
+    db: ProfileDB,
+    cpus: int = 0,
+    constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
+) -> list[DelimitResult]:
+    seqs = db.prepare(sequences)
+    seq_lengths = {s.name: len(s) for s in seqs}
+    hits_by_seq = db.search(seqs, cpus=cpus)
+    results = []
+    for seq_id, hits in hits_by_seq.items():
+        chain = build_chain(hits, constraints)
+        if chain is None:
+            continue
+        seq_length = seq_lengths.get(seq_id, 0)
+        bounds = extract_regions(chain, seq_length)
+        results.append(
+            DelimitResult(
+                seq_id=seq_id,
+                seq_length=seq_length,
+                strand=chain.strand,
+                chain=chain,
+                bounds=bounds,
+                confidence=chain.confidence,
+            )
+        )
     return results
 
 
@@ -57,85 +111,3 @@ def _orient_from_hits(
         top_score=top_score_by_strand[best_strand],
         n_anchors=count_by_strand[best_strand],
     )
-
-
-def classify(
-    sequences: Union[
-        pyhmmer.easel.DigitalSequenceBlock,
-        Iterable[pyhmmer.easel.DigitalSequence],
-    ],
-    db: ProfileDB,
-    cpus: int = 0,
-    constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
-) -> list[ClassifyResult]:
-    hits_by_seq = db.search(sequences, cpus=cpus)
-    results = []
-    for seq_id, hits in hits_by_seq.items():
-        chain = build_chain(hits, constraints)
-        if chain is None:
-            continue
-        has_its1 = (
-            chain.anchors[AnchorType.SSU_END.value - 1] is not None
-            and chain.anchors[AnchorType.S58_START.value - 1] is not None
-        )
-        has_its2 = (
-            chain.anchors[AnchorType.S58_END.value - 1] is not None
-            and chain.anchors[AnchorType.LSU_START.value - 1] is not None
-        )
-        results.append(
-            ClassifyResult(
-                seq_id=seq_id,
-                strand=chain.strand,
-                has_its1=has_its1,
-                has_its2=has_its2,
-                confidence=chain.confidence,
-                chain=chain,
-            )
-        )
-    return results
-
-
-def delimit(
-    sequences: Union[
-        pyhmmer.easel.DigitalSequenceBlock,
-        Iterable[pyhmmer.easel.DigitalSequence],
-    ],
-    db: ProfileDB,
-    cpus: int = 0,
-    constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
-) -> list[DelimitResult]:
-    seq_lengths = _collect_seq_lengths(sequences)
-    hits_by_seq = db.search(sequences, cpus=cpus)
-    results = []
-    for seq_id, hits in hits_by_seq.items():
-        chain = build_chain(hits, constraints)
-        if chain is None:
-            continue
-        seq_length = seq_lengths.get(seq_id, 0)
-        bounds = extract_regions(chain, seq_length)
-        results.append(
-            DelimitResult(
-                seq_id=seq_id,
-                seq_length=seq_length,
-                strand=chain.strand,
-                chain=chain,
-                bounds=bounds,
-                confidence=chain.confidence,
-            )
-        )
-    return results
-
-
-def _collect_seq_lengths(
-    sequences: Union[
-        pyhmmer.easel.DigitalSequenceBlock,
-        Iterable[pyhmmer.easel.DigitalSequence],
-    ],
-) -> dict[str, int]:
-    lengths = {}
-    try:
-        for seq in sequences:
-            lengths[seq.name] = len(seq)
-    except TypeError:
-        pass
-    return lengths

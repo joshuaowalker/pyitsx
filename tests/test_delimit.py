@@ -12,8 +12,7 @@ class TestDelimit:
 
     def test_delimit_test_fasta(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(itsx_test_fasta)
-        results = delimit(seqs, db, cpus=1)
+        results = delimit(itsx_test_fasta, db, cpus=1)
 
         assert len(results) > 0
         for r in results:
@@ -23,8 +22,7 @@ class TestDelimit:
 
     def test_full_chains_have_five_regions(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(itsx_test_fasta)
-        results = delimit(seqs, db, cpus=1)
+        results = delimit(itsx_test_fasta, db, cpus=1)
 
         full_results = [r for r in results if r.chain.is_full]
         assert len(full_results) > 10
@@ -39,8 +37,7 @@ class TestDelimit:
 
     def test_region_coordinates_are_ordered(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(itsx_test_fasta)
-        results = delimit(seqs, db, cpus=1)
+        results = delimit(itsx_test_fasta, db, cpus=1)
 
         for r in results:
             if r.chain.is_full:
@@ -50,8 +47,7 @@ class TestDelimit:
 
     def test_its_regions_have_reasonable_lengths(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(itsx_test_fasta)
-        results = delimit(seqs, db, cpus=1)
+        results = delimit(itsx_test_fasta, db, cpus=1)
 
         for r in results:
             its1 = r.get_region(Region.ITS1)
@@ -63,8 +59,7 @@ class TestDelimit:
 
     def test_get_region_returns_none_for_missing(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(itsx_test_fasta)
-        results = delimit(seqs, db, cpus=1)
+        results = delimit(itsx_test_fasta, db, cpus=1)
 
         partial_results = [r for r in results if not r.chain.is_full]
         if partial_results:

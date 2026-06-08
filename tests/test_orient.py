@@ -13,8 +13,7 @@ class TestOrient:
 
     def test_orient_test_fasta(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(itsx_test_fasta)
-        results = orient(seqs, db, cpus=1)
+        results = orient(itsx_test_fasta, db, cpus=1)
 
         assert len(results) > 40
         for r in results:
@@ -24,23 +23,15 @@ class TestOrient:
             assert r.n_anchors > 0
 
     def test_orient_mostly_plus_strand(self, itsx_test_fasta):
-        """ITSx test.fasta sequences are mostly in forward orientation."""
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(itsx_test_fasta)
-        results = orient(seqs, db, cpus=1)
+        results = orient(itsx_test_fasta, db, cpus=1)
 
         plus_count = sum(1 for r in results if r.strand == Strand.PLUS)
         assert plus_count > len(results) * 0.8
 
     def test_orient_returns_nothing_for_no_hits(self):
-        """Sequences with no anchor hits should not appear in results."""
         db = ProfileDB(ITSX_DB, organism="F")
-        alphabet = db._alphabet
-        seq = pyhmmer.easel.TextSequence(
-            name=b"random_seq", sequence="ACGTACGTACGT" * 10
-        ).digitize(alphabet)
-
-        results = orient([seq], db, cpus=1)
+        results = orient([("random_seq", "ACGTACGTACGT" * 10)], db, cpus=1)
         assert len(results) == 0
 
 
@@ -50,8 +41,7 @@ class TestOrientConsensus:
     @pytest.fixture(scope="class")
     def orient_results(self, consensus_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
-        seqs = db.load_sequences(consensus_fasta)
-        return orient(seqs, db, cpus=4)
+        return orient(consensus_fasta, db, cpus=4)
 
     def test_high_detection_rate(self, orient_results, consensus_fasta):
         from Bio import SeqIO

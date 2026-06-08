@@ -2,7 +2,9 @@
 
 __version__ = "0.1.0"
 
+from pyitsx.constants import Confidence, Region, Strand
 from pyitsx.models import (
+    ChainConstraints,
     ClassifyResult,
     DelimitResult,
     OrientResult,
@@ -12,12 +14,16 @@ from pyitsx.pipeline import classify, delimit, orient
 from pyitsx.profiles import ProfileDB
 
 __all__ = [
-    "ProfileDB",
+    "ChainConstraints",
     "classify",
     "ClassifyResult",
+    "Confidence",
     "delimit",
     "DelimitResult",
     "orient",
     "OrientResult",
+    "ProfileDB",
+    "Region",
     "RegionBounds",
+    "Strand",
 ]
