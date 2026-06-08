@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.so
+.pytest_cache/
+htmlcov/
+.coverage
+.ruff_cache/
+.venv/
+venv/
+CLAUDE.md
+
+# Don't track the reference papers or ITSx source
+*.pdf
+ITSx_1.1.3/
