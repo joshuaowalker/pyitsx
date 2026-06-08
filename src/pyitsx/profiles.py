@@ -1,7 +1,7 @@
 import logging
 import os
 import shutil
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Iterable, Optional, Sequence, Union
 
@@ -16,6 +16,9 @@ from pyitsx.models import AnchorHit
 logger = logging.getLogger(__name__)
 
 WINDOW_LENGTH = 200
+DEFAULT_BATCH_SIZE = 1
+SHORTCIRCUIT_SCORE = 20.0
+SHORTCIRCUIT_EVALUE = 1e-4
 
 SequenceInput = Union[
     Path,
@@ -44,6 +47,8 @@ class ProfileDB:
         self._hmms = _load_hmms(hmm_path)
         self._alphabet = pyhmmer.easel.Alphabet.dna()
         self.organism = organism
+        self._profiles_by_anchor = _group_profiles(self._hmms)
+        self._profile_freq: Counter = Counter()
         logger.info(
             "Loaded %d profiles for organism %s from %s",
             len(self._hmms), organism, hmm_dir,
@@ -54,6 +59,8 @@ class ProfileDB:
         db = cls.__new__(cls)
         db._hmms = _load_hmms(hmm_path)
         db._alphabet = pyhmmer.easel.Alphabet.dna()
+        db._profiles_by_anchor = _group_profiles(db._hmms)
+        db._profile_freq = Counter()
         try:
             db.organism = Organism.from_code(hmm_path.stem)
         except ValueError:
@@ -113,24 +120,30 @@ class ProfileDB:
         self,
         sequences: pyhmmer.easel.DigitalSequenceBlock,
         cpus: int = 1,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+    ) -> dict[str, list[AnchorHit]]:
+        if batch_size <= 0:
+            return self._search_bulk(sequences, cpus)
+        return self._search_batched(sequences, cpus, batch_size)
+
+    def _search_bulk(
+        self,
+        sequences: pyhmmer.easel.DigitalSequenceBlock,
+        cpus: int,
     ) -> dict[str, list[AnchorHit]]:
         hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
-
         for top_hits in pyhmmer.hmmer.nhmmer(
             self._hmms, sequences, cpus=cpus, window_length=WINDOW_LENGTH
         ):
             profile_name = top_hits.query.name
-            anchor_prefix = profile_name.split("_")[0]
-            try:
-                anchor_type = AnchorType.from_profile_prefix(anchor_prefix)
-            except (ValueError, KeyError):
+            anchor_type = _parse_anchor_type(profile_name)
+            if anchor_type is None:
                 continue
-
             for hit in top_hits:
                 if not hit.included:
                     continue
                 for domain in hit.domains:
-                    anchor_hit = AnchorHit(
+                    hits_by_seq[hit.name].append(AnchorHit(
                         anchor_type=anchor_type,
                         strand=Strand(domain.strand),
                         env_from=domain.env_from,
@@ -138,8 +151,55 @@ class ProfileDB:
                         score=domain.score,
                         evalue=domain.i_evalue,
                         profile_name=profile_name,
-                    )
-                    hits_by_seq[hit.name].append(anchor_hit)
+                    ))
+        return dict(hits_by_seq)
+
+    def _search_batched(
+        self,
+        sequences: pyhmmer.easel.DigitalSequenceBlock,
+        cpus: int,
+        batch_size: int,
+    ) -> dict[str, list[AnchorHit]]:
+        hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
+        batches = _make_batches(sequences, batch_size, self._alphabet)
+
+        for anchor_type in AnchorType:
+            profiles = self._profiles_by_anchor.get(anchor_type, [])
+            if not profiles:
+                continue
+            profiles = sorted(
+                profiles,
+                key=lambda p: self._profile_freq.get(p.name, 0),
+                reverse=True,
+            )
+            for block in batches:
+                satisfied: set[str] = set()
+                n_seqs = len(block)
+                for profile in profiles:
+                    if len(satisfied) >= n_seqs:
+                        break
+                    profile_name = profile.name
+                    for top_hits in pyhmmer.hmmer.nhmmer(
+                        [profile], block, cpus=cpus, window_length=WINDOW_LENGTH
+                    ):
+                        for hit in top_hits:
+                            if not hit.included:
+                                continue
+                            for domain in hit.domains:
+                                ah = AnchorHit(
+                                    anchor_type=anchor_type,
+                                    strand=Strand(domain.strand),
+                                    env_from=domain.env_from,
+                                    env_to=domain.env_to,
+                                    score=domain.score,
+                                    evalue=domain.i_evalue,
+                                    profile_name=profile_name,
+                                )
+                                hits_by_seq[hit.name].append(ah)
+                                if (ah.score >= SHORTCIRCUIT_SCORE
+                                        and ah.evalue <= SHORTCIRCUIT_EVALUE):
+                                    satisfied.add(hit.name)
+                                    self._profile_freq[profile_name] += 1
 
         return dict(hits_by_seq)
 
@@ -184,6 +244,42 @@ class ProfileDB:
             )
             block.append(ts.digitize(self._alphabet))
         return block
+
+
+def _parse_anchor_type(profile_name: str) -> Optional[AnchorType]:
+    prefix = profile_name.split("_")[0]
+    try:
+        return AnchorType(int(prefix))
+    except (ValueError, KeyError):
+        return None
+
+
+def _group_profiles(
+    hmms: list[pyhmmer.plan7.HMM],
+) -> dict[AnchorType, list[pyhmmer.plan7.HMM]]:
+    groups: dict[AnchorType, list[pyhmmer.plan7.HMM]] = defaultdict(list)
+    for hmm in hmms:
+        anchor_type = _parse_anchor_type(hmm.name)
+        if anchor_type is not None:
+            groups[anchor_type].append(hmm)
+    return dict(groups)
+
+
+def _make_batches(
+    sequences: pyhmmer.easel.DigitalSequenceBlock,
+    batch_size: int,
+    alphabet: pyhmmer.easel.Alphabet,
+) -> list[pyhmmer.easel.DigitalSequenceBlock]:
+    batches = []
+    block = pyhmmer.easel.DigitalSequenceBlock(alphabet)
+    for s in sequences:
+        block.append(s)
+        if len(block) >= batch_size:
+            batches.append(block)
+            block = pyhmmer.easel.DigitalSequenceBlock(alphabet)
+    if len(block) > 0:
+        batches.append(block)
+    return batches
 
 
 def find_hmm_dir() -> Path:

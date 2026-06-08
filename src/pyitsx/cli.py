@@ -34,7 +34,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=[o.name for o in Organism],
         help="Organism group code (default: F for fungi)",
     )
-    shared.add_argument("--cpus", type=int, default=0, help="CPU threads (default: all available)")
+    shared.add_argument("--cpus", type=int, default=0, help="CPU threads for HMM search (default: all available)")
+    shared.add_argument("--batch-size", type=int, default=1, help="Sequences per search batch (default: 1)")
     shared.add_argument("--format", choices=["tsv", "jsonl"], default="tsv", help="Output format")
 
     subparsers.add_parser("orient", parents=[shared], help="Determine 5'->3' orientation")
@@ -78,13 +79,13 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         if args.command == "orient":
-            results = orient(seqs, db, cpus=args.cpus)
+            results = orient(seqs, db, cpus=args.cpus, batch_size=args.batch_size)
             _write_orient(results, out, args.format)
         elif args.command == "classify":
-            results = classify(seqs, db, cpus=args.cpus)
+            results = classify(seqs, db, cpus=args.cpus, batch_size=args.batch_size)
             _write_classify(results, out, args.format)
         elif args.command == "delimit":
-            results = delimit(seqs, db, cpus=args.cpus)
+            results = delimit(seqs, db, cpus=args.cpus, batch_size=args.batch_size)
             _write_delimit(results, out, args.format)
     finally:
         if args.output:

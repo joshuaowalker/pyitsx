@@ -10,7 +10,7 @@ from pyitsx.models import (
     DelimitResult,
     OrientResult,
 )
-from pyitsx.profiles import ProfileDB, SequenceInput
+from pyitsx.profiles import DEFAULT_BATCH_SIZE, ProfileDB, SequenceInput
 from pyitsx.regions import extract_regions
 
 
@@ -18,9 +18,10 @@ def orient(
     sequences: SequenceInput,
     db: ProfileDB,
     cpus: int = 1,
+    batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> list[OrientResult]:
     seqs = db.prepare(sequences)
-    hits_by_seq = db.search(seqs, cpus=cpus)
+    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
     results = []
     for seq_id, hits in hits_by_seq.items():
         result = _orient_from_hits(seq_id, hits)
@@ -33,11 +34,12 @@ def classify(
     sequences: SequenceInput,
     db: ProfileDB,
     cpus: int = 1,
+    batch_size: int = DEFAULT_BATCH_SIZE,
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
 ) -> list[ClassifyResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
-    hits_by_seq = db.search(seqs, cpus=cpus)
+    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
     results = []
     for seq_id, hits in hits_by_seq.items():
         chain = build_chain(hits, constraints)
@@ -63,11 +65,12 @@ def delimit(
     sequences: SequenceInput,
     db: ProfileDB,
     cpus: int = 1,
+    batch_size: int = DEFAULT_BATCH_SIZE,
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
 ) -> list[DelimitResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
-    hits_by_seq = db.search(seqs, cpus=cpus)
+    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
     results = []
     for seq_id, hits in hits_by_seq.items():
         chain = build_chain(hits, constraints)
