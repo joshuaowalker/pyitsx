@@ -2,7 +2,7 @@
 
 __version__ = "0.1.0"
 
-from pyitsx.constants import Confidence, Region, Strand
+from pyitsx.constants import Confidence, Organism, Region, Strand
 from pyitsx.models import (
     ChainConstraints,
     ClassifyResult,
@@ -21,6 +21,7 @@ __all__ = [
     "delimit",
     "find_hmm_dir",
     "DelimitResult",
+    "Organism",
     "orient",
     "OrientResult",
     "ProfileDB",

@@ -1,7 +1,7 @@
 import pytest
 from collections import Counter
 
-from pyitsx.constants import AnchorType, Strand
+from pyitsx.constants import AnchorType, Organism, Strand
 from pyitsx.profiles import ProfileDB, find_hmm_dir
 from tests.conftest import requires_hmm_db, ITSX_DB
 
@@ -12,7 +12,7 @@ class TestProfileDB:
     def test_load_profiles(self):
         db = ProfileDB(ITSX_DB, organism="F")
         assert db.n_profiles == 538
-        assert db.organism == "F"
+        assert db.organism == Organism.F
 
     def test_search_returns_hits(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")

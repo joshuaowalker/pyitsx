@@ -10,7 +10,7 @@ import pyhmmer.easel
 import pyhmmer.hmmer
 import pyhmmer.plan7
 
-from pyitsx.constants import AnchorType, Strand
+from pyitsx.constants import AnchorType, Organism, Strand
 from pyitsx.models import AnchorHit
 
 logger = logging.getLogger(__name__)
@@ -29,10 +29,16 @@ SequenceInput = Union[
 class ProfileDB:
     """Loaded HMM profiles for a single organism group."""
 
-    def __init__(self, hmm_dir: Optional[Path] = None, organism: str = "F"):
+    def __init__(
+        self,
+        hmm_dir: Optional[Path] = None,
+        organism: Union[Organism, str] = Organism.F,
+    ):
+        if isinstance(organism, str):
+            organism = Organism.from_code(organism)
         if hmm_dir is None:
             hmm_dir = find_hmm_dir()
-        hmm_path = Path(hmm_dir) / f"{organism}.hmm"
+        hmm_path = Path(hmm_dir) / f"{organism.name}.hmm"
         if not hmm_path.exists():
             raise FileNotFoundError(f"HMM profile not found: {hmm_path}")
         self._hmms = _load_hmms(hmm_path)
@@ -48,7 +54,10 @@ class ProfileDB:
         db = cls.__new__(cls)
         db._hmms = _load_hmms(hmm_path)
         db._alphabet = pyhmmer.easel.Alphabet.dna()
-        db.organism = hmm_path.stem
+        try:
+            db.organism = Organism.from_code(hmm_path.stem)
+        except ValueError:
+            db.organism = hmm_path.stem
         return db
 
     @property

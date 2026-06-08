@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from pyitsx import __version__
-from pyitsx.constants import Region
+from pyitsx.constants import Organism, Region
 from pyitsx.models import ChainConstraints, DEFAULT_CONSTRAINTS
 from pyitsx.pipeline import classify, delimit, orient
 from pyitsx.profiles import ProfileDB
@@ -29,7 +29,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     shared.add_argument("-i", "--input", required=True, type=Path, help="Input FASTA file")
     shared.add_argument("-o", "--output", type=Path, help="Output file (default: stdout)")
     shared.add_argument("--hmm-dir", type=Path, default=None, help="Path to ITSx HMM profile directory (auto-detected if omitted)")
-    shared.add_argument("--organism", default="F", help="Organism group (default: F for fungi)")
+    shared.add_argument(
+        "--organism", default="F",
+        choices=[o.name for o in Organism],
+        help="Organism group code (default: F for fungi)",
+    )
     shared.add_argument("--cpus", type=int, default=0, help="CPU threads (default: all available)")
     shared.add_argument("--format", choices=["tsv", "jsonl"], default="tsv", help="Output format")
 
