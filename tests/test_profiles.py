@@ -2,7 +2,7 @@ import pytest
 from collections import Counter
 
 from pyitsx.constants import AnchorType, Strand
-from pyitsx.profiles import ProfileDB
+from pyitsx.profiles import ProfileDB, find_hmm_dir
 from tests.conftest import requires_hmm_db, ITSX_DB
 
 
@@ -63,3 +63,48 @@ class TestProfileDB:
                 strand_counts[h.strand] += 1
 
         assert strand_counts[Strand.PLUS] > 0
+
+
+class TestFindHmmDir:
+
+    def test_env_var_override(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PYITSX_HMM_DIR", str(tmp_path))
+        assert find_hmm_dir() == tmp_path
+
+    def test_env_var_missing_dir_raises(self, monkeypatch):
+        monkeypatch.setenv("PYITSX_HMM_DIR", "/nonexistent/path")
+        with pytest.raises(FileNotFoundError, match="PYITSX_HMM_DIR"):
+            find_hmm_dir()
+
+    def test_itsx_on_path(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("PYITSX_HMM_DIR", raising=False)
+        hmm_dir = tmp_path / "ITSx_db" / "HMMs"
+        hmm_dir.mkdir(parents=True)
+        fake_itsx = tmp_path / "ITSx"
+        fake_itsx.write_text("#!/bin/sh\n")
+        fake_itsx.chmod(0o755)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        assert find_hmm_dir() == hmm_dir
+
+    def test_nothing_found_raises(self, monkeypatch):
+        monkeypatch.delenv("PYITSX_HMM_DIR", raising=False)
+        monkeypatch.setenv("PATH", "/nonexistent")
+        with pytest.raises(FileNotFoundError, match="Cannot find ITSx HMM profiles"):
+            find_hmm_dir()
+
+    def test_auto_detect_from_real_itsx(self):
+        """If ITSx is actually installed, find_hmm_dir should locate it."""
+        import shutil
+        if not shutil.which("ITSx"):
+            pytest.skip("ITSx not installed")
+        result = find_hmm_dir()
+        assert result.is_dir()
+        assert (result / "F.hmm").exists()
+
+    def test_profiledb_auto_detect(self):
+        """ProfileDB() with no hmm_dir should auto-detect when ITSx is installed."""
+        import shutil
+        if not shutil.which("ITSx"):
+            pytest.skip("ITSx not installed")
+        db = ProfileDB(organism="F")
+        assert db.n_profiles > 0

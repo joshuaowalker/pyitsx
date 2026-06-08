@@ -11,7 +11,7 @@ from pyitsx.models import (
     RegionBounds,
 )
 from pyitsx.pipeline import classify, delimit, orient
-from pyitsx.profiles import ProfileDB
+from pyitsx.profiles import ProfileDB, find_hmm_dir
 
 __all__ = [
     "ChainConstraints",
@@ -19,6 +19,7 @@ __all__ = [
     "ClassifyResult",
     "Confidence",
     "delimit",
+    "find_hmm_dir",
     "DelimitResult",
     "orient",
     "OrientResult",

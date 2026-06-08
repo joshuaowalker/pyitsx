@@ -4,12 +4,26 @@ import os
 import pytest
 from pathlib import Path
 
+from pyitsx.profiles import find_hmm_dir
+
 
 DATA_DIR = Path(os.environ.get("PYITSX_TEST_DATA", Path.home() / "mm" / "data"))
-ITSX_DB = Path(os.environ.get(
-    "PYITSX_HMM_DB",
-    Path(__file__).parent.parent / "ITSx_1.1.3" / "ITSx_db" / "HMMs",
-))
+
+
+def _resolve_hmm_db() -> Path:
+    env = os.environ.get("PYITSX_HMM_DB")
+    if env:
+        return Path(env)
+    local = Path(__file__).parent.parent / "ITSx_1.1.3" / "ITSx_db" / "HMMs"
+    if local.is_dir():
+        return local
+    try:
+        return find_hmm_dir()
+    except FileNotFoundError:
+        return local
+
+
+ITSX_DB = _resolve_hmm_db()
 
 
 def _has_test_data():

@@ -1,7 +1,9 @@
 import logging
+import os
+import shutil
 from collections import defaultdict
 from pathlib import Path
-from typing import Iterable, Sequence, Union
+from typing import Iterable, Optional, Sequence, Union
 
 import pyhmmer
 import pyhmmer.easel
@@ -27,15 +29,18 @@ SequenceInput = Union[
 class ProfileDB:
     """Loaded HMM profiles for a single organism group."""
 
-    def __init__(self, hmm_dir: Path, organism: str = "F"):
-        hmm_path = hmm_dir / f"{organism}.hmm"
+    def __init__(self, hmm_dir: Optional[Path] = None, organism: str = "F"):
+        if hmm_dir is None:
+            hmm_dir = find_hmm_dir()
+        hmm_path = Path(hmm_dir) / f"{organism}.hmm"
         if not hmm_path.exists():
             raise FileNotFoundError(f"HMM profile not found: {hmm_path}")
         self._hmms = _load_hmms(hmm_path)
         self._alphabet = pyhmmer.easel.Alphabet.dna()
         self.organism = organism
         logger.info(
-            "Loaded %d profiles for organism %s", len(self._hmms), organism
+            "Loaded %d profiles for organism %s from %s",
+            len(self._hmms), organism, hmm_dir,
         )
 
     @classmethod
@@ -170,6 +175,34 @@ class ProfileDB:
             )
             block.append(ts.digitize(self._alphabet))
         return block
+
+
+def find_hmm_dir() -> Path:
+    """Auto-detect the ITSx HMM profile directory.
+
+    Search order:
+      1. PYITSX_HMM_DIR environment variable
+      2. ITSx_db/HMMs/ alongside the ITSx executable on PATH
+    """
+    env_dir = os.environ.get("PYITSX_HMM_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        if p.is_dir():
+            return p
+        raise FileNotFoundError(
+            f"PYITSX_HMM_DIR is set to {env_dir} but directory does not exist"
+        )
+
+    itsx_bin = shutil.which("ITSx")
+    if itsx_bin:
+        candidate = Path(itsx_bin).resolve().parent / "ITSx_db" / "HMMs"
+        if candidate.is_dir():
+            return candidate
+
+    raise FileNotFoundError(
+        "Cannot find ITSx HMM profiles. Either pass hmm_dir explicitly, "
+        "set PYITSX_HMM_DIR, or install ITSx so it is on PATH."
+    )
 
 
 def _load_hmms(hmm_path: Path) -> list[pyhmmer.plan7.HMM]:
