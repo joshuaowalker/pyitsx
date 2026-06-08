@@ -104,6 +104,8 @@ def _best_partial_chain(
         (AnchorType.SSU_END, AnchorType.S58_START, constraints.min_its1, constraints.max_its1),
         (AnchorType.S58_END, AnchorType.LSU_START, constraints.min_its2, constraints.max_its2),
         (AnchorType.SSU_END, AnchorType.LSU_START, constraints.min_full, constraints.max_full),
+        # 5.8S-only: anchors 2+3 span the interior of 5.8S (~67bp gap between ~45bp models)
+        (AnchorType.S58_START, AnchorType.S58_END, 20, 200),
     ]
 
     best: Optional[AnchorChain] = None
