@@ -15,8 +15,9 @@ class TestOrient:
         db = ProfileDB(ITSX_DB, organism="F")
         results = orient(itsx_test_fasta, db, cpus=1)
 
-        assert len(results) > 40
-        for r in results:
+        detected = [r for r in results if r.strand is not None]
+        assert len(detected) > 40
+        for r in detected:
             assert isinstance(r, OrientResult)
             assert isinstance(r.strand, Strand)
             assert r.top_score > 0
@@ -26,13 +27,17 @@ class TestOrient:
         db = ProfileDB(ITSX_DB, organism="F")
         results = orient(itsx_test_fasta, db, cpus=1)
 
-        plus_count = sum(1 for r in results if r.strand == Strand.PLUS)
-        assert plus_count > len(results) * 0.8
+        detected = [r for r in results if r.strand is not None]
+        plus_count = sum(1 for r in detected if r.strand == Strand.PLUS)
+        assert plus_count > len(detected) * 0.8
 
-    def test_orient_returns_nothing_for_no_hits(self):
+    def test_orient_includes_undetected(self):
         db = ProfileDB(ITSX_DB, organism="F")
         results = orient([("random_seq", "ACGTACGTACGT" * 10)], db, cpus=1)
-        assert len(results) == 0
+        assert len(results) == 1
+        assert results[0].strand is None
+        assert results[0].top_score == 0.0
+        assert results[0].n_anchors == 0
 
 
 @requires_hmm_db
@@ -47,8 +52,10 @@ class TestOrientConsensus:
         from Bio import SeqIO
 
         n_seqs = sum(1 for _ in SeqIO.parse(consensus_fasta, "fasta"))
-        assert len(orient_results) > n_seqs * 0.9
+        detected = [r for r in orient_results if r.strand is not None]
+        assert len(detected) > n_seqs * 0.9
 
-    def test_all_have_strand(self, orient_results):
-        for r in orient_results:
+    def test_all_detected_have_strand(self, orient_results):
+        detected = [r for r in orient_results if r.strand is not None]
+        for r in detected:
             assert r.strand in (Strand.PLUS, Strand.MINUS)

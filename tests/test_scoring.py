@@ -23,15 +23,15 @@ class TestScoreOrganisms:
         for r in results:
             assert isinstance(r, OrganismResult)
 
-    def test_best_organism_is_mostly_fungi_for_fungal_seqs(self, itsx_test_fasta):
+    def test_best_organism_is_fungi_for_fungal_seqs(self, itsx_test_fasta):
         results = score_organisms(
             itsx_test_fasta, hmm_dir=ITSX_DB,
             organisms=[Organism.F, Organism.T], cpus=1,
         )
         detected = [r for r in results if r.best is not None]
         assert len(detected) > 0
-        fungi_best = sum(1 for r in detected if r.best.organism == Organism.F)
-        assert fungi_best / len(detected) > 0.9
+        for r in detected:
+            assert r.best.organism == Organism.F
 
     def test_scores_sorted_descending(self, itsx_test_fasta):
         results = score_organisms(
@@ -61,7 +61,7 @@ class TestScoreOrganisms:
         assert len(detected) > 0
         for r in detected:
             assert isinstance(r.best, OrganismScore)
-            assert r.best.n_anchors > 0
+            assert 1 <= r.best.n_anchors <= 4
             assert r.best.total_score > 0
             assert r.best.best_evalue > 0
 

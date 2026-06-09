@@ -18,7 +18,7 @@ class AnchorHit:
 @dataclass(frozen=True)
 class OrientResult:
     seq_id: str
-    strand: Strand
+    strand: Optional[Strand]
     top_score: float
     n_anchors: int
     chimeric: bool = False

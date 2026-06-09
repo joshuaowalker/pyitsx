@@ -15,7 +15,10 @@ from pyitsx.models import (
 from pyitsx.profiles import DEFAULT_BATCH_SIZE, ProfileDB, SequenceInput
 from pyitsx.regions import extract_regions
 
-_COMPLEMENT = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+_COMPLEMENT = str.maketrans(
+    "ACGTacgtNnRYSWKMBDHVryswkmbdhv",
+    "TGCAtgcaNnYRSWMKVHDByrswmkvhdb",
+)
 
 
 def orient(
@@ -26,12 +29,25 @@ def orient(
     mode: SearchMode = SearchMode.FAST,
 ) -> list[OrientResult]:
     seqs = db.prepare(sequences)
+    all_seq_ids = [s.name for s in seqs]
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
     results = []
+    detected_ids: set[str] = set()
     for seq_id, hits in hits_by_seq.items():
         result = _orient_from_hits(seq_id, hits)
         if result is not None:
+            detected_ids.add(seq_id)
             results.append(result)
+    for seq_id in all_seq_ids:
+        if seq_id not in detected_ids:
+            results.append(
+                OrientResult(
+                    seq_id=seq_id,
+                    strand=None,
+                    top_score=0.0,
+                    n_anchors=0,
+                )
+            )
     return results
 
 

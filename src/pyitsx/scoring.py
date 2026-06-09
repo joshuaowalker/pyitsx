@@ -11,8 +11,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Sequence
 
-from pyitsx.constants import Organism, SearchMode
-from pyitsx.models import OrganismResult, OrganismScore
+from pyitsx.constants import AnchorType, Organism, SearchMode
+from pyitsx.models import AnchorHit, OrganismResult, OrganismScore
 from pyitsx.profiles import DEFAULT_BATCH_SIZE, ProfileDB, SequenceInput, find_hmm_dir
 
 logger = logging.getLogger(__name__)
@@ -57,14 +57,8 @@ def score_organisms(
             hits = hits_by_seq.get(seq_id, [])
             if not hits:
                 continue
-            scores_by_seq[seq_id].append(
-                OrganismScore(
-                    organism=org,
-                    n_anchors=len(hits),
-                    total_score=sum(h.score for h in hits),
-                    best_evalue=min(h.evalue for h in hits),
-                )
-            )
+            score = _score_hits(org, hits)
+            scores_by_seq[seq_id].append(score)
 
     results = []
     for seq_id in all_seq_ids:
@@ -82,3 +76,18 @@ def score_organisms(
         )
 
     return results
+
+
+def _score_hits(org: Organism, hits: list[AnchorHit]) -> OrganismScore:
+    best_by_anchor: dict[AnchorType, AnchorHit] = {}
+    for h in hits:
+        prev = best_by_anchor.get(h.anchor_type)
+        if prev is None or h.score > prev.score:
+            best_by_anchor[h.anchor_type] = h
+    anchors = list(best_by_anchor.values())
+    return OrganismScore(
+        organism=org,
+        n_anchors=len(anchors),
+        total_score=sum(h.score for h in anchors),
+        best_evalue=min(h.evalue for h in anchors),
+    )

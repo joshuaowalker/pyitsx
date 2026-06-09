@@ -43,11 +43,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     subparsers.add_parser("orient", parents=[shared], help="Determine 5'->3' orientation")
     subparsers.add_parser("classify", parents=[shared], help="Classify ITS region type")
 
-    delimit_parser = subparsers.add_parser("delimit", parents=[shared], help="Full region delimitation")
-    delimit_parser.add_argument(
-        "--region", choices=["all", "its1", "its2", "full"],
-        default="all", help="Which region(s) to report",
-    )
+    subparsers.add_parser("delimit", parents=[shared], help="Full region delimitation")
 
     extract_parser = subparsers.add_parser("extract", parents=[shared], help="Extract ITS region sequences")
     extract_parser.add_argument(
@@ -88,36 +84,37 @@ def main(argv: list[str] | None = None) -> None:
     t0 = time.perf_counter()
 
     mode = SearchMode(args.mode)
-    db = ProfileDB(args.hmm_dir, organism=args.organism)
-    seqs = db.load_sequences(args.input)
-    logger.info("Loaded %d sequences", len(seqs))
-
     out = open(args.output, "w") if args.output else sys.stdout
 
     try:
-        if args.command == "orient":
-            results = orient(seqs, db, cpus=args.cpus, batch_size=args.batch_size, mode=mode)
-            _write_orient(results, out, args.format)
-        elif args.command == "classify":
-            results = classify(seqs, db, cpus=args.cpus, batch_size=args.batch_size, mode=mode)
-            _write_classify(results, out, args.format)
-        elif args.command == "delimit":
-            results = delimit(seqs, db, cpus=args.cpus, batch_size=args.batch_size, mode=mode)
-            _write_delimit(results, out, args.format)
-        elif args.command == "extract":
-            region_enums = [Region(r) for r in args.regions] if args.regions else None
-            results = extract(
-                seqs, db, regions=region_enums,
-                cpus=args.cpus, batch_size=args.batch_size, mode=mode,
-            )
-            _write_extract(results, out, args.format)
-        elif args.command == "score":
+        if args.command == "score":
             org_enums = [Organism[o] for o in args.organisms] if args.organisms else None
             results = score_organisms(
-                seqs, hmm_dir=args.hmm_dir, organisms=org_enums,
+                args.input, hmm_dir=args.hmm_dir, organisms=org_enums,
                 cpus=args.cpus, batch_size=args.batch_size, mode=mode,
             )
             _write_score(results, out, args.format)
+        else:
+            db = ProfileDB(args.hmm_dir, organism=args.organism)
+            seqs = db.load_sequences(args.input)
+            logger.info("Loaded %d sequences", len(seqs))
+
+            if args.command == "orient":
+                results = orient(seqs, db, cpus=args.cpus, batch_size=args.batch_size, mode=mode)
+                _write_orient(results, out, args.format)
+            elif args.command == "classify":
+                results = classify(seqs, db, cpus=args.cpus, batch_size=args.batch_size, mode=mode)
+                _write_classify(results, out, args.format)
+            elif args.command == "delimit":
+                results = delimit(seqs, db, cpus=args.cpus, batch_size=args.batch_size, mode=mode)
+                _write_delimit(results, out, args.format)
+            elif args.command == "extract":
+                region_enums = [Region(r) for r in args.regions] if args.regions else None
+                results = extract(
+                    seqs, db, regions=region_enums,
+                    cpus=args.cpus, batch_size=args.batch_size, mode=mode,
+                )
+                _write_extract(results, out, args.format)
     finally:
         if args.output:
             out.close()
@@ -125,19 +122,20 @@ def main(argv: list[str] | None = None) -> None:
     elapsed = time.perf_counter() - t0
     logger.info(
         "Done: %d results in %.1fs (%.0f seq/s)",
-        len(results), elapsed, len(seqs) / elapsed,
+        len(results), elapsed, len(results) / elapsed if elapsed > 0 else 0,
     )
 
 
 def _write_orient(results, out, fmt):
     if fmt == "jsonl":
         for r in results:
-            json.dump({"seq_id": r.seq_id, "strand": r.strand.value, "top_score": r.top_score, "n_anchors": r.n_anchors, "chimeric": r.chimeric}, out)
+            json.dump({"seq_id": r.seq_id, "strand": r.strand.value if r.strand else "-", "top_score": r.top_score, "n_anchors": r.n_anchors, "chimeric": r.chimeric}, out)
             out.write("\n")
     else:
         out.write("seq_id\tstrand\ttop_score\tn_anchors\tchimeric\n")
         for r in results:
-            out.write(f"{r.seq_id}\t{r.strand.value}\t{r.top_score:.1f}\t{r.n_anchors}\t{r.chimeric}\n")
+            strand = r.strand.value if r.strand else "-"
+            out.write(f"{r.seq_id}\t{strand}\t{r.top_score:.1f}\t{r.n_anchors}\t{r.chimeric}\n")
 
 
 def _write_classify(results, out, fmt):

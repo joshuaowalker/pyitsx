@@ -27,15 +27,18 @@ keywords = ["bioinformatics", "ITS", "fungi", "HMM", "nanopore", "amplicon"]
 
 dependencies = [
     "pyhmmer>=0.10.0",
-    "biopython>=1.81",
 ]
 
 [project.optional-dependencies]
+bio = [
+    "biopython>=1.81",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+    "biopython>=1.81",
 ]
 test = [
     "pytest>=7.0.0",
