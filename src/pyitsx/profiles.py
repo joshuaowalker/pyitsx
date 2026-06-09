@@ -10,7 +10,7 @@ import pyhmmer.easel
 import pyhmmer.hmmer
 import pyhmmer.plan7
 
-from pyitsx.constants import AnchorType, Organism, Strand
+from pyitsx.constants import AnchorType, Organism, SearchMode, Strand
 from pyitsx.models import AnchorHit
 
 logger = logging.getLogger(__name__)
@@ -215,6 +215,7 @@ class ProfileDB:
         sequences: pyhmmer.easel.DigitalSequenceBlock,
         cpus: int = 1,
         batch_size: int = DEFAULT_BATCH_SIZE,
+        mode: SearchMode = SearchMode.FAST,
     ) -> dict[str, list[AnchorHit]]:
         hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
         batches = _make_batches(sequences, max(batch_size, 1), self._alphabet)
@@ -232,7 +233,7 @@ class ProfileDB:
                 satisfied: set[str] = set()
                 n_seqs = len(block)
                 for profile in profiles:
-                    if len(satisfied) >= n_seqs:
+                    if mode == SearchMode.FAST and len(satisfied) >= n_seqs:
                         break
                     profile_name = profile.name
                     for top_hits in pyhmmer.hmmer.nhmmer(

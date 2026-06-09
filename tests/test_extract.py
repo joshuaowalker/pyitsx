@@ -57,3 +57,37 @@ class TestExtract:
                 assert 50 <= len(r.sequence) <= 1500
             elif r.region == Region.ITS2:
                 assert 50 <= len(r.sequence) <= 2000
+
+    def test_extract_full_its(self, itsx_test_fasta):
+        db = ProfileDB(ITSX_DB, organism="F")
+        results = extract(itsx_test_fasta, db, regions=[Region.FULL_ITS], cpus=1)
+
+        assert len(results) > 0
+        for r in results:
+            assert r.region == Region.FULL_ITS
+            assert len(r.sequence) > 0
+
+    def test_full_its_length_matches_components(self, itsx_test_fasta):
+        db = ProfileDB(ITSX_DB, organism="F")
+        full_results = extract(itsx_test_fasta, db, regions=[Region.FULL_ITS], cpus=1)
+        component_results = extract(
+            itsx_test_fasta, db,
+            regions=[Region.ITS1, Region.S58, Region.ITS2], cpus=1,
+        )
+
+        components_by_seq = {}
+        for r in component_results:
+            components_by_seq.setdefault(r.seq_id, 0)
+            components_by_seq[r.seq_id] += len(r.sequence)
+
+        for r in full_results:
+            expected = components_by_seq.get(r.seq_id)
+            if expected is not None:
+                assert len(r.sequence) == expected
+
+    def test_extract_default_excludes_full_its(self, itsx_test_fasta):
+        db = ProfileDB(ITSX_DB, organism="F")
+        results = extract(itsx_test_fasta, db, cpus=1)
+
+        for r in results:
+            assert r.region != Region.FULL_ITS

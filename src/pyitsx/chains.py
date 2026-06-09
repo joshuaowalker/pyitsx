@@ -137,6 +137,34 @@ def _best_partial_chain(
     return best
 
 
+def detect_chimera(
+    hits: list[AnchorHit],
+    score_threshold: float = 20.0,
+) -> bool:
+    if not hits:
+        return False
+
+    plus_score = sum(h.score for h in hits if h.strand == Strand.PLUS and h.score >= score_threshold)
+    minus_score = sum(h.score for h in hits if h.strand == Strand.MINUS and h.score >= score_threshold)
+    if plus_score >= score_threshold and minus_score >= score_threshold:
+        return True
+
+    dominant = Strand.PLUS if plus_score >= minus_score else Strand.MINUS
+    best_by_anchor: dict[AnchorType, AnchorHit] = {}
+    for h in hits:
+        if h.strand != dominant or h.score < score_threshold:
+            continue
+        if h.anchor_type not in best_by_anchor or h.score > best_by_anchor[h.anchor_type].score:
+            best_by_anchor[h.anchor_type] = h
+
+    ordered = sorted(best_by_anchor.values(), key=lambda h: h.anchor_type.value)
+    for i in range(len(ordered) - 1):
+        if ordered[i].env_to >= ordered[i + 1].env_from:
+            return True
+
+    return False
+
+
 def _assess_confidence(
     anchors: list[AnchorHit],
     constraints: ChainConstraints,

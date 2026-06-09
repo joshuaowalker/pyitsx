@@ -1,8 +1,8 @@
 from collections import defaultdict
 from typing import Optional, Sequence
 
-from pyitsx.chains import build_chain
-from pyitsx.constants import Confidence, Region, Strand
+from pyitsx.chains import build_chain, detect_chimera
+from pyitsx.constants import Confidence, Region, SearchMode, Strand
 from pyitsx.models import (
     AnchorHit,
     ChainConstraints,
@@ -23,9 +23,10 @@ def orient(
     db: ProfileDB,
     cpus: int = 1,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    mode: SearchMode = SearchMode.FAST,
 ) -> list[OrientResult]:
     seqs = db.prepare(sequences)
-    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
+    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
     results = []
     for seq_id, hits in hits_by_seq.items():
         result = _orient_from_hits(seq_id, hits)
@@ -40,11 +41,12 @@ def classify(
     cpus: int = 1,
     batch_size: int = DEFAULT_BATCH_SIZE,
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
+    mode: SearchMode = SearchMode.FAST,
 ) -> list[ClassifyResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
     all_seq_ids = [s.name for s in seqs]
-    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
+    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
     results = []
     detected_ids: set[str] = set()
     for seq_id, hits in hits_by_seq.items():
@@ -63,6 +65,7 @@ def classify(
                 has_its2=Region.ITS2 in region_set,
                 confidence=chain.confidence,
                 chain=chain,
+                chimeric=detect_chimera(hits),
             )
         )
     for seq_id in all_seq_ids:
@@ -86,11 +89,12 @@ def delimit(
     cpus: int = 1,
     batch_size: int = DEFAULT_BATCH_SIZE,
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
+    mode: SearchMode = SearchMode.FAST,
 ) -> list[DelimitResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
     all_seq_ids = [s.name for s in seqs]
-    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
+    hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
     results = []
     detected_ids: set[str] = set()
     for seq_id, hits in hits_by_seq.items():
@@ -108,6 +112,7 @@ def delimit(
                 chain=chain,
                 bounds=bounds,
                 confidence=chain.confidence,
+                chimeric=detect_chimera(hits),
             )
         )
     for seq_id in all_seq_ids:
@@ -132,6 +137,7 @@ def extract(
     cpus: int = 1,
     batch_size: int = DEFAULT_BATCH_SIZE,
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
+    mode: SearchMode = SearchMode.FAST,
 ) -> list[ExtractionResult]:
     seqs = db.prepare(sequences)
     text_by_id: dict[str, str] = {}
@@ -139,8 +145,10 @@ def extract(
         ts = ds.textize()
         text_by_id[ds.name] = ts.sequence
 
-    delimit_results = delimit(seqs, db, cpus=cpus, batch_size=batch_size, constraints=constraints)
+    delimit_results = delimit(seqs, db, cpus=cpus, batch_size=batch_size, constraints=constraints, mode=mode)
     target_regions = set(regions) if regions is not None else None
+    wants_full_its = target_regions is not None and Region.FULL_ITS in target_regions
+    normal_regions = (target_regions - {Region.FULL_ITS}) if target_regions is not None else None
 
     extracted: list[ExtractionResult] = []
     for r in delimit_results:
@@ -152,7 +160,7 @@ def extract(
         if r.strand == Strand.MINUS:
             seq_text = seq_text.translate(_COMPLEMENT)[::-1]
         for b in r.bounds:
-            if target_regions is not None and b.region not in target_regions:
+            if normal_regions is not None and b.region not in normal_regions:
                 continue
             extracted.append(
                 ExtractionResult(
@@ -163,6 +171,18 @@ def extract(
                     sequence=seq_text[b.start - 1 : b.end],
                 )
             )
+        if wants_full_its:
+            full = r.full_its
+            if full is not None:
+                extracted.append(
+                    ExtractionResult(
+                        seq_id=r.seq_id,
+                        region=Region.FULL_ITS,
+                        start=full.start,
+                        end=full.end,
+                        sequence=seq_text[full.start - 1 : full.end],
+                    )
+                )
     return extracted
 
 
@@ -188,4 +208,5 @@ def _orient_from_hits(
         strand=best_strand,
         top_score=top_score_by_strand[best_strand],
         n_anchors=count_by_strand[best_strand],
+        chimeric=detect_chimera(hits),
     )

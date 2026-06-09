@@ -87,6 +87,29 @@ class TestDelimit:
         assert isinstance(regions[Region.ITS1], RegionBounds)
         assert regions[Region.ITS1] == r.get_region(Region.ITS1)
 
+    def test_full_its_property(self, itsx_test_fasta):
+        db = ProfileDB(ITSX_DB, organism="F")
+        results = delimit(itsx_test_fasta, db, cpus=1)
+
+        full_results = [r for r in results if r.chain and r.chain.is_full]
+        assert len(full_results) > 0
+        for r in full_results:
+            full = r.full_its
+            assert full is not None
+            assert full.region == Region.FULL_ITS
+            its1 = r.get_region(Region.ITS1)
+            its2 = r.get_region(Region.ITS2)
+            assert full.start == its1.start
+            assert full.end == its2.end
+
+    def test_full_its_none_when_missing_region(self, itsx_test_fasta):
+        db = ProfileDB(ITSX_DB, organism="F")
+        results = delimit(itsx_test_fasta, db, cpus=1)
+
+        undetected = [r for r in results if r.confidence == Confidence.NONE]
+        for r in undetected:
+            assert r.full_its is None
+
     def test_undetected_sequences_included(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
         seqs = db.prepare(itsx_test_fasta)

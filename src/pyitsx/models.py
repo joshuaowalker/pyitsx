@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from pyitsx.constants import AnchorType, Confidence, Region, Strand
+from pyitsx.constants import AnchorType, Confidence, Organism, Region, Strand
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,7 @@ class OrientResult:
     strand: Strand
     top_score: float
     n_anchors: int
+    chimeric: bool = False
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,7 @@ class ClassifyResult:
     has_its2: bool
     confidence: Confidence
     chain: Optional[AnchorChain]
+    chimeric: bool = False
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,7 @@ class DelimitResult:
     chain: Optional[AnchorChain]
     bounds: tuple[RegionBounds, ...]
     confidence: Confidence
+    chimeric: bool = False
 
     def get_region(self, region: Region) -> Optional[RegionBounds]:
         for b in self.bounds:
@@ -94,6 +97,14 @@ class DelimitResult:
     def regions(self) -> dict[Region, RegionBounds]:
         return {b.region: b for b in self.bounds}
 
+    @property
+    def full_its(self) -> Optional[RegionBounds]:
+        its1 = self.get_region(Region.ITS1)
+        its2 = self.get_region(Region.ITS2)
+        if its1 is not None and its2 is not None:
+            return RegionBounds(Region.FULL_ITS, its1.start, its2.end)
+        return None
+
 
 @dataclass(frozen=True)
 class ExtractionResult:
@@ -102,3 +113,18 @@ class ExtractionResult:
     start: int
     end: int
     sequence: str
+
+
+@dataclass(frozen=True)
+class OrganismScore:
+    organism: Organism
+    n_anchors: int
+    total_score: float
+    best_evalue: float
+
+
+@dataclass(frozen=True)
+class OrganismResult:
+    seq_id: str
+    best: Optional[OrganismScore]
+    scores: tuple[OrganismScore, ...]

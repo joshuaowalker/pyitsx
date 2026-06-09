@@ -24,12 +24,18 @@ class Confidence(Enum):
     NONE = "none"
 
 
+class SearchMode(Enum):
+    FAST = "fast"
+    BEST = "best"
+
+
 class Region(Enum):
     SSU = "SSU"
     ITS1 = "ITS1"
     S58 = "5.8S"
     ITS2 = "ITS2"
     LSU = "LSU"
+    FULL_ITS = "full_ITS"
 
 
 class Organism(Enum):
