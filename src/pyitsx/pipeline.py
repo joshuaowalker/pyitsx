@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Optional, Sequence
 
 from pyitsx.chains import build_chain, detect_chimera
@@ -29,25 +29,21 @@ def orient(
     mode: SearchMode = SearchMode.FAST,
 ) -> list[OrientResult]:
     seqs = db.prepare(sequences)
-    all_seq_ids = [s.name for s in seqs]
+    id_counts = Counter(s.name for s in seqs)
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
-    results = []
-    detected_ids: set[str] = set()
+    results_by_id: dict[str, OrientResult] = {}
     for seq_id, hits in hits_by_seq.items():
         result = _orient_from_hits(seq_id, hits)
         if result is not None:
-            detected_ids.add(seq_id)
-            results.append(result)
-    for seq_id in all_seq_ids:
-        if seq_id not in detected_ids:
-            results.append(
-                OrientResult(
-                    seq_id=seq_id,
-                    strand=None,
-                    top_score=0.0,
-                    n_anchors=0,
-                )
-            )
+            results_by_id[seq_id] = result
+    results = []
+    for seq_id in id_counts:
+        n = id_counts[seq_id]
+        if seq_id in results_by_id:
+            results.extend([results_by_id[seq_id]] * n)
+        else:
+            undetected = OrientResult(seq_id=seq_id, strand=None, top_score=0.0, n_anchors=0)
+            results.extend([undetected] * n)
     return results
 
 
@@ -61,41 +57,36 @@ def classify(
 ) -> list[ClassifyResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
-    all_seq_ids = [s.name for s in seqs]
+    id_counts = Counter(s.name for s in seqs)
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
-    results = []
-    detected_ids: set[str] = set()
+    results_by_id: dict[str, ClassifyResult] = {}
     for seq_id, hits in hits_by_seq.items():
         chain = build_chain(hits, constraints)
         if chain is None:
             continue
-        detected_ids.add(seq_id)
         seq_length = seq_lengths.get(seq_id, 0)
         bounds = extract_regions(chain, seq_length)
         region_set = {b.region for b in bounds}
-        results.append(
-            ClassifyResult(
-                seq_id=seq_id,
-                strand=chain.strand,
-                has_its1=Region.ITS1 in region_set,
-                has_its2=Region.ITS2 in region_set,
-                confidence=chain.confidence,
-                chain=chain,
-                chimeric=detect_chimera(hits),
-            )
+        results_by_id[seq_id] = ClassifyResult(
+            seq_id=seq_id,
+            strand=chain.strand,
+            has_its1=Region.ITS1 in region_set,
+            has_its2=Region.ITS2 in region_set,
+            confidence=chain.confidence,
+            chain=chain,
+            chimeric=detect_chimera(hits),
         )
-    for seq_id in all_seq_ids:
-        if seq_id not in detected_ids:
-            results.append(
-                ClassifyResult(
-                    seq_id=seq_id,
-                    strand=None,
-                    has_its1=False,
-                    has_its2=False,
-                    confidence=Confidence.NONE,
-                    chain=None,
-                )
+    results = []
+    for seq_id in id_counts:
+        n = id_counts[seq_id]
+        if seq_id in results_by_id:
+            results.extend([results_by_id[seq_id]] * n)
+        else:
+            undetected = ClassifyResult(
+                seq_id=seq_id, strand=None, has_its1=False,
+                has_its2=False, confidence=Confidence.NONE, chain=None,
             )
+            results.extend([undetected] * n)
     return results
 
 
@@ -109,40 +100,35 @@ def delimit(
 ) -> list[DelimitResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
-    all_seq_ids = [s.name for s in seqs]
+    id_counts = Counter(s.name for s in seqs)
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
-    results = []
-    detected_ids: set[str] = set()
+    results_by_id: dict[str, DelimitResult] = {}
     for seq_id, hits in hits_by_seq.items():
         chain = build_chain(hits, constraints)
         if chain is None:
             continue
-        detected_ids.add(seq_id)
         seq_length = seq_lengths.get(seq_id, 0)
         bounds = extract_regions(chain, seq_length)
-        results.append(
-            DelimitResult(
-                seq_id=seq_id,
-                seq_length=seq_length,
-                strand=chain.strand,
-                chain=chain,
-                bounds=bounds,
-                confidence=chain.confidence,
-                chimeric=detect_chimera(hits),
-            )
+        results_by_id[seq_id] = DelimitResult(
+            seq_id=seq_id,
+            seq_length=seq_length,
+            strand=chain.strand,
+            chain=chain,
+            bounds=bounds,
+            confidence=chain.confidence,
+            chimeric=detect_chimera(hits),
         )
-    for seq_id in all_seq_ids:
-        if seq_id not in detected_ids:
-            results.append(
-                DelimitResult(
-                    seq_id=seq_id,
-                    seq_length=seq_lengths.get(seq_id, 0),
-                    strand=None,
-                    chain=None,
-                    bounds=(),
-                    confidence=Confidence.NONE,
-                )
+    results = []
+    for seq_id in id_counts:
+        n = id_counts[seq_id]
+        if seq_id in results_by_id:
+            results.extend([results_by_id[seq_id]] * n)
+        else:
+            undetected = DelimitResult(
+                seq_id=seq_id, seq_length=seq_lengths.get(seq_id, 0),
+                strand=None, chain=None, bounds=(), confidence=Confidence.NONE,
             )
+            results.extend([undetected] * n)
     return results
 
 

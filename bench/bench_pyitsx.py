@@ -12,10 +12,12 @@ from pathlib import Path
 from Bio import SeqIO
 
 
-def bench_pyitsx(input_path: Path, hmm_dir: Path, cpus: int, max_seqs: int = 0):
+def bench_pyitsx(input_path: Path, hmm_dir: Path, cpus: int, max_seqs: int = 0, mode: str = "fast"):
+    from pyitsx.constants import Confidence, SearchMode
     from pyitsx.pipeline import delimit
     from pyitsx.profiles import ProfileDB
 
+    search_mode = SearchMode(mode)
     db = ProfileDB(hmm_dir, organism="F")
     seqs = db.load_sequences(input_path)
     if max_seqs:
@@ -23,18 +25,19 @@ def bench_pyitsx(input_path: Path, hmm_dir: Path, cpus: int, max_seqs: int = 0):
     n = len(seqs)
 
     t0 = time.perf_counter()
-    results = delimit(seqs, db, cpus=cpus)
+    results = delimit(seqs, db, cpus=cpus, mode=search_mode)
     elapsed = time.perf_counter() - t0
 
-    full = sum(1 for r in results if r.chain.is_full)
+    detected = [r for r in results if r.confidence != Confidence.NONE]
+    full = sum(1 for r in detected if r.chain and r.chain.is_full)
     return {
-        "tool": "pyitsx",
+        "tool": f"pyitsx ({mode})",
         "n_sequences": n,
         "elapsed_seconds": round(elapsed, 3),
         "seqs_per_second": round(n / elapsed, 1),
-        "detected": len(results),
+        "detected": len(detected),
         "full_chains": full,
-        "partial_chains": len(results) - full,
+        "partial_chains": len(detected) - full,
         "cpus": cpus,
     }
 
@@ -141,32 +144,45 @@ def main():
     )
     args = parser.parse_args()
 
-    results = {}
+    all_results = {}
     hmm_file = args.hmm_dir / "F.hmm"
 
     for tool in args.tools:
-        print(f"\n{'='*60}", file=sys.stderr)
-        print(f"Benchmarking {tool}...", file=sys.stderr)
-        try:
-            if tool == "pyitsx":
-                results[tool] = bench_pyitsx(args.input, args.hmm_dir, args.cpus, args.max_seqs)
-            elif tool == "itsx":
-                results[tool] = bench_itsx(args.input, args.cpus, args.max_seqs)
-            elif tool == "itsxrust":
-                results[tool] = bench_itsxrust(args.input, hmm_file, args.cpus, args.max_seqs)
-            r = results[tool]
-            print(f"  {r['detected']}/{r['n_sequences']} detected in {r['elapsed_seconds']}s ({r['seqs_per_second']} seq/s)", file=sys.stderr)
-        except Exception as e:
-            print(f"  FAILED: {e}", file=sys.stderr)
-            results[tool] = {"tool": tool, "error": str(e)}
+        if tool == "pyitsx":
+            for mode in ("fast", "best"):
+                key = f"pyitsx_{mode}"
+                print(f"\n{'='*60}", file=sys.stderr)
+                print(f"Benchmarking pyitsx ({mode})...", file=sys.stderr)
+                try:
+                    all_results[key] = bench_pyitsx(args.input, args.hmm_dir, args.cpus, args.max_seqs, mode=mode)
+                    r = all_results[key]
+                    print(f"  {r['detected']}/{r['n_sequences']} detected in {r['elapsed_seconds']}s ({r['seqs_per_second']} seq/s)", file=sys.stderr)
+                except Exception as e:
+                    print(f"  FAILED: {e}", file=sys.stderr)
+                    all_results[key] = {"tool": f"pyitsx ({mode})", "error": str(e)}
+        else:
+            print(f"\n{'='*60}", file=sys.stderr)
+            print(f"Benchmarking {tool}...", file=sys.stderr)
+            try:
+                if tool == "itsx":
+                    all_results[tool] = bench_itsx(args.input, args.cpus, args.max_seqs)
+                elif tool == "itsxrust":
+                    all_results[tool] = bench_itsxrust(args.input, hmm_file, args.cpus, args.max_seqs)
+                r = all_results[tool]
+                print(f"  {r['detected']}/{r['n_sequences']} detected in {r['elapsed_seconds']}s ({r['seqs_per_second']} seq/s)", file=sys.stderr)
+            except Exception as e:
+                print(f"  FAILED: {e}", file=sys.stderr)
+                all_results[tool] = {"tool": tool, "error": str(e)}
 
     print(f"\n{'='*60}", file=sys.stderr)
     print("Summary:", file=sys.stderr)
-    for tool, r in results.items():
+    for key, r in all_results.items():
         if "error" in r:
-            print(f"  {tool}: FAILED — {r['error']}", file=sys.stderr)
+            print(f"  {r['tool']}: FAILED — {r['error']}", file=sys.stderr)
         else:
-            print(f"  {tool}: {r['seqs_per_second']} seq/s ({r['detected']}/{r['n_sequences']} detected)", file=sys.stderr)
+            print(f"  {r['tool']}: {r['seqs_per_second']} seq/s ({r['detected']}/{r['n_sequences']} detected)", file=sys.stderr)
+
+    results = all_results
 
     if args.output:
         with open(args.output, "w") as f:

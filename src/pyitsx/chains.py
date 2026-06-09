@@ -31,7 +31,16 @@ def build_chain(
         if chain and (best_partial is None or chain.total_score > best_partial.total_score):
             best_partial = chain
 
-    return best_partial
+    if best_partial is not None:
+        return best_partial
+
+    best_single: Optional[AnchorChain] = None
+    for strand in (Strand.PLUS, Strand.MINUS):
+        chain = _best_single_anchor_chain(grouped, strand, constraints)
+        if chain and (best_single is None or chain.total_score > best_single.total_score):
+            best_single = chain
+
+    return best_single
 
 
 def _group_hits(
@@ -135,6 +144,30 @@ def _best_partial_chain(
                 )
 
     return best
+
+
+def _best_single_anchor_chain(
+    grouped: dict[tuple[Strand, AnchorType], list[AnchorHit]],
+    strand: Strand,
+    constraints: ChainConstraints,
+) -> Optional[AnchorChain]:
+    for anchor_type in (AnchorType.SSU_END, AnchorType.LSU_START):
+        candidates = grouped.get((strand, anchor_type), [])
+        if not candidates:
+            continue
+        best_hit = candidates[0]
+        if (best_hit.score < constraints.min_anchor_score
+                or best_hit.evalue > constraints.max_anchor_evalue):
+            continue
+        anchors = [None, None, None, None]
+        anchors[anchor_type.value - 1] = best_hit
+        return AnchorChain(
+            anchors=tuple(anchors),
+            strand=strand,
+            total_score=best_hit.score,
+            confidence=Confidence.PARTIAL,
+        )
+    return None
 
 
 def detect_chimera(

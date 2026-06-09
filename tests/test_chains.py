@@ -196,8 +196,22 @@ class TestBuildChainPartial:
     def test_no_chain_from_empty(self):
         assert build_chain([], CONSTRAINTS) is None
 
-    def test_no_chain_from_single_anchor(self):
+    def test_single_ssu_end_builds_partial_chain(self):
         hits = [_hit(AnchorType.SSU_END, 10, 50, score=100)]
+        chain = build_chain(hits, CONSTRAINTS)
+        assert chain is not None
+        assert chain.confidence == Confidence.PARTIAL
+        assert chain.n_anchors == 1
+        assert chain.anchors[0] is not None
+        assert chain.anchors[1] is None
+
+    def test_single_weak_anchor_no_chain(self):
+        hits = [_hit(AnchorType.SSU_END, 10, 50, score=5, evalue=0.1)]
+        chain = build_chain(hits, CONSTRAINTS)
+        assert chain is None
+
+    def test_single_s58_anchor_no_chain(self):
+        hits = [_hit(AnchorType.S58_START, 100, 150, score=100)]
         chain = build_chain(hits, CONSTRAINTS)
         assert chain is None
 
