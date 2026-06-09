@@ -216,47 +216,8 @@ class ProfileDB:
         cpus: int = 1,
         batch_size: int = DEFAULT_BATCH_SIZE,
     ) -> dict[str, list[AnchorHit]]:
-        if batch_size <= 0:
-            return self._search_bulk(sequences, cpus)
-        return self._search_batched(sequences, cpus, batch_size)
-
-    def _search_bulk(
-        self,
-        sequences: pyhmmer.easel.DigitalSequenceBlock,
-        cpus: int,
-    ) -> dict[str, list[AnchorHit]]:
         hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
-        for top_hits in pyhmmer.hmmer.nhmmer(
-            self._hmms, sequences, cpus=cpus, window_length=WINDOW_LENGTH,
-            Z=_NHMMER_Z,
-        ):
-            profile_name = top_hits.query.name
-            anchor_type = _parse_anchor_type(profile_name)
-            if anchor_type is None:
-                continue
-            for hit in top_hits:
-                if not hit.included:
-                    continue
-                for domain in hit.domains:
-                    hits_by_seq[hit.name].append(AnchorHit(
-                        anchor_type=anchor_type,
-                        strand=Strand(domain.strand),
-                        env_from=domain.env_from,
-                        env_to=domain.env_to,
-                        score=domain.score,
-                        evalue=domain.i_evalue,
-                        profile_name=profile_name,
-                    ))
-        return dict(hits_by_seq)
-
-    def _search_batched(
-        self,
-        sequences: pyhmmer.easel.DigitalSequenceBlock,
-        cpus: int,
-        batch_size: int,
-    ) -> dict[str, list[AnchorHit]]:
-        hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
-        batches = _make_batches(sequences, batch_size, self._alphabet)
+        batches = _make_batches(sequences, max(batch_size, 1), self._alphabet)
 
         for anchor_type in AnchorType:
             profiles = self._profiles_by_anchor.get(anchor_type, [])
