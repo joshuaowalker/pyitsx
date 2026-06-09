@@ -19,6 +19,95 @@ WINDOW_LENGTH = 200
 DEFAULT_BATCH_SIZE = 1
 SHORTCIRCUIT_SCORE = 20.0
 SHORTCIRCUIT_EVALUE = 1e-4
+# Fixed database size (Mb) for nhmmer E-value calculation.
+# Normalizes E-values to per-sequence scale (~1 Kb) so detection
+# sensitivity is independent of how many sequences are in the input.
+_NHMMER_Z = 0.001
+
+# Empirical profile ordering for fungi, derived from 103K macrofungi dataset.
+# Profiles listed first produce confident hits (score >= 20) on the most
+# sequences. Used to seed _profile_freq so the first batch gets near-optimal
+# short-circuit behavior. Profiles absent from the loaded HMMs are ignored;
+# profiles present in HMMs but not listed here start at priority 0.
+_DEFAULT_PROFILE_ORDER: dict[str, dict[str, list[str]]] = {
+    "F": {
+        "SSU_END": [
+            "1_SSU_Fungi_Ge_1_SSU_end_onea_long",
+            "1_SSU_Fungi_Cr_1_SSU_end_long",
+            "1_SSU_Fungi_Tu_1_SSU_end_four_long",
+            "1_SSU_Fungi_Ge_1_SSU_end_oneb_long",
+            "1_SSU_Fungi_Ca_1_SSU_end_long",
+            "1_SSU_Fungi_Ge_1_SSU_end_threeh_long",
+            "1_SSU_Fungi_Ge_1_SSU_end_five_long",
+            "1_SSU_Fungi_Ge_1_SSU_end_zero_long",
+            "1_SSU_Fungi_Ge_1_SSU_end_threej_long",
+            "1_SSU_Fungi_Ge_1_SSU_end_nine_long",
+        ],
+        "S58_START": [
+            "2_5.8_Fungi_Ge_58S_start_zero_long",
+            "2_5.8_Fungi_Ge_58S_start_threed_long",
+            "2_5.8_Fungi_Ca_58S_start_long",
+            "2_5.8_Fungi_Ge_58S_start_two_long",
+            "2_5.8_Fungi_Ge_58S_start_oned_long",
+            "2_5.8_Tedersoo_58S_start_long_one",
+        ],
+        "S58_END": [
+            "3_End_Fungi_Ge_58S_end_fourteenb_long",
+            "3_End_Fungi_Ge_58S_end_thirtyfived_long",
+            "3_End_Fungi_Ge_58S_end_oneg_long",
+            "3_End_Fungi_Ge_58S_end_twentyc_long",
+            "3_End_Fungi_Ge_58S_end_thirtythree_long",
+            "3_End_Fungi_Ge_58S_end_thirtyfivea_long",
+            "3_End_Fungi_Ge_58S_end_thirtyoneb_long",
+            "3_End_Fungi_Ge_58S_end_foura_long",
+            "3_End_Fungi_Ge_58S_end_thirtyfour_long",
+            "3_End_Fungi_Ge_58S_end_thirtytwo_long",
+            "3_End_Tedersoo_58S_end_long_ten",
+            "3_End_Fungi_Ge_58S_end_threea_long",
+            "3_End_Fungi_Ge_58S_end_oned_long",
+            "3_End_Fungi_Ge_58S_end_thirtyfivec_long",
+            "3_End_Fungi_Ge_58S_end_ninetythree_long",
+            "3_End_Fungi_Ge_58S_end_twentysix_long",
+            "3_End_Fungi_Ge_58S_end_seventyonea_long",
+            "3_End_Fungi_Ge_58S_end_seventyoneb_long",
+            "3_end_Calocera_58S_end_long_three",
+            "3_End_Fungi_Ge_58S_end_sixtyfive_long",
+            "3_End_Fungi_Ge_58S_end_fiftythree_long",
+            "3_End_Fungi_Ge_58S_end_nineteen_long",
+            "3_End_Fungi_Ge_58S_end_fiftyone_long",
+            "3_End_Fungi_Ca_58S_end_one_long",
+            "3_End_Fungi_Ge_58S_end_sixtyc_long",
+            "3_end_Calocera_58S_end_long_two",
+            "3_End_Fungi_Cr_58S_end_one_long",
+        ],
+        "LSU_START": [
+            "4_LSU_Fungi_Ge_4_LSU_start_zeroe_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_fortythree_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_zerof_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_zeroq_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_zerok_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_sixteen_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_fortyfive_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_seventeen_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_zerog_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_zeroj_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_fortyfour_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_tena_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_nine_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_elevenc_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_zeroc_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_twentythreea_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_six_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_zerob_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_seven_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_two_long",
+            "4_LSU_Fungi_Ge_4_LSU_start_twentyfive_long",
+            "4_LSU_Fungi_Cr_4_LSU_start_two_long",
+            "4_LSU_Fungi_Ca_4_LSU_start_three_long",
+            "4_LSU_Fungi_Tu_4_LSU_start_fourteen_long",
+        ],
+    },
+}
 
 SequenceInput = Union[
     Path,
@@ -49,6 +138,7 @@ class ProfileDB:
         self.organism = organism
         self._profiles_by_anchor = _group_profiles(self._hmms)
         self._profile_freq: Counter = Counter()
+        _seed_profile_freq(self._profile_freq, organism.name, self._hmms)
         logger.info(
             "Loaded %d profiles for organism %s from %s",
             len(self._hmms), organism, hmm_dir,
@@ -61,6 +151,10 @@ class ProfileDB:
         db._alphabet = pyhmmer.easel.Alphabet.dna()
         db._profiles_by_anchor = _group_profiles(db._hmms)
         db._profile_freq = Counter()
+        try:
+            _seed_profile_freq(db._profile_freq, hmm_path.stem, db._hmms)
+        except (ValueError, KeyError):
+            pass
         try:
             db.organism = Organism.from_code(hmm_path.stem)
         except ValueError:
@@ -133,7 +227,8 @@ class ProfileDB:
     ) -> dict[str, list[AnchorHit]]:
         hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
         for top_hits in pyhmmer.hmmer.nhmmer(
-            self._hmms, sequences, cpus=cpus, window_length=WINDOW_LENGTH
+            self._hmms, sequences, cpus=cpus, window_length=WINDOW_LENGTH,
+            Z=_NHMMER_Z,
         ):
             profile_name = top_hits.query.name
             anchor_type = _parse_anchor_type(profile_name)
@@ -180,7 +275,8 @@ class ProfileDB:
                         break
                     profile_name = profile.name
                     for top_hits in pyhmmer.hmmer.nhmmer(
-                        [profile], block, cpus=cpus, window_length=WINDOW_LENGTH
+                        [profile], block, cpus=cpus, window_length=WINDOW_LENGTH,
+                        Z=_NHMMER_Z,
                     ):
                         for hit in top_hits:
                             if not hit.included:
@@ -280,6 +376,28 @@ def _make_batches(
     if len(block) > 0:
         batches.append(block)
     return batches
+
+
+def _seed_profile_freq(
+    freq: Counter,
+    organism_code: str,
+    hmms: list[pyhmmer.plan7.HMM],
+) -> None:
+    """Seed profile frequency counter from empirical ordering.
+
+    Assigns decreasing synthetic counts so profiles sort in the
+    recommended order for short-circuit. Only profiles actually present
+    in the loaded HMMs are seeded; unknown names are silently skipped.
+    """
+    ordering = _DEFAULT_PROFILE_ORDER.get(organism_code)
+    if ordering is None:
+        return
+    loaded_names = {hmm.name for hmm in hmms}
+    for anchor_names in ordering.values():
+        n = len(anchor_names)
+        for i, name in enumerate(anchor_names):
+            if name in loaded_names:
+                freq[name] = n - i
 
 
 def find_hmm_dir() -> Path:
