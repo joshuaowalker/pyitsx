@@ -21,6 +21,7 @@ class Confidence(Enum):
     CONFIDENT = "confident"
     AMBIGUOUS = "ambiguous"
     PARTIAL = "partial"
+    NONE = "none"
 
 
 class Region(Enum):

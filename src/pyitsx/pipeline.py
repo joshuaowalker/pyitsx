@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Optional, Sequence
 
 from pyitsx.chains import build_chain
 from pyitsx.constants import Confidence, Region, Strand
@@ -8,10 +9,13 @@ from pyitsx.models import (
     ClassifyResult,
     DEFAULT_CONSTRAINTS,
     DelimitResult,
+    ExtractionResult,
     OrientResult,
 )
 from pyitsx.profiles import DEFAULT_BATCH_SIZE, ProfileDB, SequenceInput
 from pyitsx.regions import extract_regions
+
+_COMPLEMENT = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
 
 
 def orient(
@@ -39,12 +43,15 @@ def classify(
 ) -> list[ClassifyResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
+    all_seq_ids = [s.name for s in seqs]
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
     results = []
+    detected_ids: set[str] = set()
     for seq_id, hits in hits_by_seq.items():
         chain = build_chain(hits, constraints)
         if chain is None:
             continue
+        detected_ids.add(seq_id)
         seq_length = seq_lengths.get(seq_id, 0)
         bounds = extract_regions(chain, seq_length)
         region_set = {b.region for b in bounds}
@@ -58,6 +65,18 @@ def classify(
                 chain=chain,
             )
         )
+    for seq_id in all_seq_ids:
+        if seq_id not in detected_ids:
+            results.append(
+                ClassifyResult(
+                    seq_id=seq_id,
+                    strand=None,
+                    has_its1=False,
+                    has_its2=False,
+                    confidence=Confidence.NONE,
+                    chain=None,
+                )
+            )
     return results
 
 
@@ -70,12 +89,15 @@ def delimit(
 ) -> list[DelimitResult]:
     seqs = db.prepare(sequences)
     seq_lengths = {s.name: len(s) for s in seqs}
+    all_seq_ids = [s.name for s in seqs]
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size)
     results = []
+    detected_ids: set[str] = set()
     for seq_id, hits in hits_by_seq.items():
         chain = build_chain(hits, constraints)
         if chain is None:
             continue
+        detected_ids.add(seq_id)
         seq_length = seq_lengths.get(seq_id, 0)
         bounds = extract_regions(chain, seq_length)
         results.append(
@@ -88,7 +110,60 @@ def delimit(
                 confidence=chain.confidence,
             )
         )
+    for seq_id in all_seq_ids:
+        if seq_id not in detected_ids:
+            results.append(
+                DelimitResult(
+                    seq_id=seq_id,
+                    seq_length=seq_lengths.get(seq_id, 0),
+                    strand=None,
+                    chain=None,
+                    bounds=(),
+                    confidence=Confidence.NONE,
+                )
+            )
     return results
+
+
+def extract(
+    sequences: SequenceInput,
+    db: ProfileDB,
+    regions: Optional[Sequence[Region]] = None,
+    cpus: int = 1,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
+) -> list[ExtractionResult]:
+    seqs = db.prepare(sequences)
+    text_by_id: dict[str, str] = {}
+    for ds in seqs:
+        ts = ds.textize()
+        text_by_id[ds.name] = ts.sequence
+
+    delimit_results = delimit(seqs, db, cpus=cpus, batch_size=batch_size, constraints=constraints)
+    target_regions = set(regions) if regions is not None else None
+
+    extracted: list[ExtractionResult] = []
+    for r in delimit_results:
+        if r.confidence == Confidence.NONE:
+            continue
+        seq_text = text_by_id.get(r.seq_id)
+        if seq_text is None:
+            continue
+        if r.strand == Strand.MINUS:
+            seq_text = seq_text.translate(_COMPLEMENT)[::-1]
+        for b in r.bounds:
+            if target_regions is not None and b.region not in target_regions:
+                continue
+            extracted.append(
+                ExtractionResult(
+                    seq_id=r.seq_id,
+                    region=b.region,
+                    start=b.start,
+                    end=b.end,
+                    sequence=seq_text[b.start - 1 : b.end],
+                )
+            )
+    return extracted
 
 
 def _orient_from_hits(

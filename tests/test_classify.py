@@ -15,7 +15,9 @@ class TestClassify:
         results = classify(itsx_test_fasta, db, cpus=1)
 
         assert len(results) > 0
-        for r in results:
+        detected = [r for r in results if r.confidence != Confidence.NONE]
+        assert len(detected) > 0
+        for r in detected:
             assert isinstance(r, ClassifyResult)
             assert isinstance(r.strand, Strand)
             assert isinstance(r.confidence, Confidence)

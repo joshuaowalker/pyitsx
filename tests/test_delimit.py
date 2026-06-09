@@ -1,7 +1,7 @@
 import pytest
 
 from pyitsx.constants import Confidence, Region, Strand
-from pyitsx.models import DelimitResult
+from pyitsx.models import DelimitResult, RegionBounds
 from pyitsx.pipeline import delimit
 from pyitsx.profiles import ProfileDB
 from tests.conftest import requires_hmm_db, ITSX_DB
@@ -15,7 +15,9 @@ class TestDelimit:
         results = delimit(itsx_test_fasta, db, cpus=1)
 
         assert len(results) > 0
-        for r in results:
+        detected = [r for r in results if r.confidence != Confidence.NONE]
+        assert len(detected) > 0
+        for r in detected:
             assert isinstance(r, DelimitResult)
             assert r.seq_length > 0
             assert len(r.bounds) > 0
@@ -24,7 +26,7 @@ class TestDelimit:
         db = ProfileDB(ITSX_DB, organism="F")
         results = delimit(itsx_test_fasta, db, cpus=1)
 
-        full_results = [r for r in results if r.chain.is_full]
+        full_results = [r for r in results if r.chain and r.chain.is_full]
         assert len(full_results) > 10
 
         for r in full_results:
@@ -40,7 +42,7 @@ class TestDelimit:
         results = delimit(itsx_test_fasta, db, cpus=1)
 
         for r in results:
-            if r.chain.is_full:
+            if r.chain and r.chain.is_full:
                 sorted_bounds = sorted(r.bounds, key=lambda b: b.start)
                 for i in range(len(sorted_bounds) - 1):
                     assert sorted_bounds[i].end < sorted_bounds[i + 1].start
@@ -61,7 +63,7 @@ class TestDelimit:
         db = ProfileDB(ITSX_DB, organism="F")
         results = delimit(itsx_test_fasta, db, cpus=1)
 
-        partial_results = [r for r in results if not r.chain.is_full]
+        partial_results = [r for r in results if r.chain and not r.chain.is_full]
         if partial_results:
             r = partial_results[0]
             missing = [
@@ -69,3 +71,36 @@ class TestDelimit:
                 if r.get_region(reg) is None
             ]
             assert len(missing) > 0
+
+    def test_regions_dict_property(self, itsx_test_fasta):
+        db = ProfileDB(ITSX_DB, organism="F")
+        results = delimit(itsx_test_fasta, db, cpus=1)
+
+        full_results = [r for r in results if r.chain and r.chain.is_full]
+        assert len(full_results) > 0
+        r = full_results[0]
+
+        regions = r.regions
+        assert isinstance(regions, dict)
+        assert Region.ITS1 in regions
+        assert Region.ITS2 in regions
+        assert isinstance(regions[Region.ITS1], RegionBounds)
+        assert regions[Region.ITS1] == r.get_region(Region.ITS1)
+
+    def test_undetected_sequences_included(self, itsx_test_fasta):
+        db = ProfileDB(ITSX_DB, organism="F")
+        seqs = db.prepare(itsx_test_fasta)
+        n_input = len(seqs)
+
+        results = delimit(seqs, db, cpus=1)
+        assert len(results) == n_input
+
+        detected = [r for r in results if r.confidence != Confidence.NONE]
+        undetected = [r for r in results if r.confidence == Confidence.NONE]
+
+        assert len(detected) + len(undetected) == n_input
+        for r in undetected:
+            assert r.strand is None
+            assert r.chain is None
+            assert r.bounds == ()
+            assert len(r.regions) == 0

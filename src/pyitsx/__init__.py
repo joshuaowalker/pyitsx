@@ -7,10 +7,11 @@ from pyitsx.models import (
     ChainConstraints,
     ClassifyResult,
     DelimitResult,
+    ExtractionResult,
     OrientResult,
     RegionBounds,
 )
-from pyitsx.pipeline import classify, delimit, orient
+from pyitsx.pipeline import classify, delimit, extract, orient
 from pyitsx.profiles import ProfileDB, find_hmm_dir
 
 __all__ = [
@@ -19,6 +20,8 @@ __all__ = [
     "ClassifyResult",
     "Confidence",
     "delimit",
+    "extract",
+    "ExtractionResult",
     "find_hmm_dir",
     "DelimitResult",
     "Organism",

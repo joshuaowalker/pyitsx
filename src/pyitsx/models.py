@@ -68,19 +68,19 @@ class RegionBounds:
 @dataclass(frozen=True)
 class ClassifyResult:
     seq_id: str
-    strand: Strand
+    strand: Optional[Strand]
     has_its1: bool
     has_its2: bool
     confidence: Confidence
-    chain: AnchorChain
+    chain: Optional[AnchorChain]
 
 
 @dataclass(frozen=True)
 class DelimitResult:
     seq_id: str
     seq_length: int
-    strand: Strand
-    chain: AnchorChain
+    strand: Optional[Strand]
+    chain: Optional[AnchorChain]
     bounds: tuple[RegionBounds, ...]
     confidence: Confidence
 
@@ -89,3 +89,16 @@ class DelimitResult:
             if b.region == region:
                 return b
         return None
+
+    @property
+    def regions(self) -> dict[Region, RegionBounds]:
+        return {b.region: b for b in self.bounds}
+
+
+@dataclass(frozen=True)
+class ExtractionResult:
+    seq_id: str
+    region: Region
+    start: int
+    end: int
+    sequence: str

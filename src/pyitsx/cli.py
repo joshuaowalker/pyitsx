@@ -10,7 +10,7 @@ from pathlib import Path
 from pyitsx import __version__
 from pyitsx.constants import Organism, Region
 from pyitsx.models import ChainConstraints, DEFAULT_CONSTRAINTS
-from pyitsx.pipeline import classify, delimit, orient
+from pyitsx.pipeline import classify, delimit, extract, orient
 from pyitsx.profiles import ProfileDB
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     delimit_parser.add_argument(
         "--region", choices=["all", "its1", "its2", "full"],
         default="all", help="Which region(s) to report",
+    )
+
+    extract_parser = subparsers.add_parser("extract", parents=[shared], help="Extract ITS region sequences")
+    extract_parser.add_argument(
+        "--region", choices=["SSU", "ITS1", "5.8S", "ITS2", "LSU"],
+        action="append", dest="regions", default=None,
+        help="Region(s) to extract (default: all detected). Can be repeated.",
     )
 
     return parser.parse_args(argv)
@@ -87,6 +94,13 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "delimit":
             results = delimit(seqs, db, cpus=args.cpus, batch_size=args.batch_size)
             _write_delimit(results, out, args.format)
+        elif args.command == "extract":
+            region_enums = [Region(r) for r in args.regions] if args.regions else None
+            results = extract(
+                seqs, db, regions=region_enums,
+                cpus=args.cpus, batch_size=args.batch_size,
+            )
+            _write_extract(results, out, args.format)
     finally:
         if args.output:
             out.close()
@@ -113,7 +127,8 @@ def _write_classify(results, out, fmt):
     if fmt == "jsonl":
         for r in results:
             json.dump({
-                "seq_id": r.seq_id, "strand": r.strand.value,
+                "seq_id": r.seq_id,
+                "strand": r.strand.value if r.strand else "-",
                 "has_its1": r.has_its1, "has_its2": r.has_its2,
                 "confidence": r.confidence.value,
             }, out)
@@ -121,7 +136,8 @@ def _write_classify(results, out, fmt):
     else:
         out.write("seq_id\tstrand\thas_its1\thas_its2\tconfidence\n")
         for r in results:
-            out.write(f"{r.seq_id}\t{r.strand.value}\t{r.has_its1}\t{r.has_its2}\t{r.confidence.value}\n")
+            strand = r.strand.value if r.strand else "-"
+            out.write(f"{r.seq_id}\t{strand}\t{r.has_its1}\t{r.has_its2}\t{r.confidence.value}\n")
 
 
 def _write_delimit(results, out, fmt):
@@ -129,7 +145,8 @@ def _write_delimit(results, out, fmt):
         for r in results:
             rec = {
                 "seq_id": r.seq_id, "seq_length": r.seq_length,
-                "strand": r.strand.value, "confidence": r.confidence.value,
+                "strand": r.strand.value if r.strand else "-",
+                "confidence": r.confidence.value,
             }
             for b in r.bounds:
                 rec[b.region.value] = f"{b.start}-{b.end}"
@@ -138,9 +155,23 @@ def _write_delimit(results, out, fmt):
     else:
         out.write("seq_id\tseq_length\tstrand\tconfidence\tSSU\tITS1\t5.8S\tITS2\tLSU\n")
         for r in results:
-            regions = {b.region: b for b in r.bounds}
-            cols = [r.seq_id, str(r.seq_length), r.strand.value, r.confidence.value]
+            strand = r.strand.value if r.strand else "-"
+            cols = [r.seq_id, str(r.seq_length), strand, r.confidence.value]
             for reg in [Region.SSU, Region.ITS1, Region.S58, Region.ITS2, Region.LSU]:
-                b = regions.get(reg)
+                b = r.regions.get(reg)
                 cols.append(f"{b.start}-{b.end}" if b else "-")
             out.write("\t".join(cols) + "\n")
+
+
+def _write_extract(results, out, fmt):
+    if fmt == "jsonl":
+        for r in results:
+            json.dump({
+                "seq_id": r.seq_id, "region": r.region.value,
+                "start": r.start, "end": r.end,
+                "sequence": r.sequence,
+            }, out)
+            out.write("\n")
+    else:
+        for r in results:
+            out.write(f">{r.seq_id}|{r.region.value}\n{r.sequence}\n")
