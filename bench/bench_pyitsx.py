@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,32 +13,77 @@ from pathlib import Path
 from Bio import SeqIO
 
 
+def _worker_delimit(args):
+    """Run delimit in a worker process on a chunk FASTA file."""
+    chunk_path, hmm_dir, mode_str = args
+    from pyitsx.constants import Confidence, SearchMode
+    from pyitsx.pipeline import delimit
+    from pyitsx.profiles import ProfileDB
+
+    db = ProfileDB(Path(hmm_dir), organism="F")
+    seqs = db.load_sequences(Path(chunk_path))
+    results = delimit(seqs, db, cpus=1, mode=SearchMode(mode_str))
+    detected = [r for r in results if r.confidence != Confidence.NONE]
+    full = sum(1 for r in detected if r.chain and r.chain.is_full)
+    return len(seqs), len(detected), full
+
+
 def bench_pyitsx(input_path: Path, hmm_dir: Path, cpus: int, max_seqs: int = 0, mode: str = "fast"):
     from pyitsx.constants import Confidence, SearchMode
     from pyitsx.pipeline import delimit
     from pyitsx.profiles import ProfileDB
 
-    search_mode = SearchMode(mode)
     db = ProfileDB(hmm_dir, organism="F")
     seqs = db.load_sequences(input_path)
     if max_seqs:
         seqs = list(seqs)[:max_seqs]
     n = len(seqs)
 
-    t0 = time.perf_counter()
-    results = delimit(seqs, db, cpus=cpus, mode=search_mode)
-    elapsed = time.perf_counter() - t0
+    if cpus <= 1:
+        t0 = time.perf_counter()
+        results = delimit(seqs, db, cpus=1, mode=SearchMode(mode))
+        elapsed = time.perf_counter() - t0
+        detected = [r for r in results if r.confidence != Confidence.NONE]
+        full = sum(1 for r in detected if r.chain and r.chain.is_full)
+        total_detected, total_full = len(detected), full
+    else:
+        from multiprocessing import Pool
 
-    detected = [r for r in results if r.confidence != Confidence.NONE]
-    full = sum(1 for r in detected if r.chain and r.chain.is_full)
+        with tempfile.TemporaryDirectory(prefix="bench_mp_") as tmpdir:
+            tmpdir = Path(tmpdir)
+            chunk_paths = []
+            chunk_size = max(1, n // cpus)
+            idx = 0
+            for i in range(cpus):
+                end = min(idx + chunk_size, n) if i < cpus - 1 else n
+                if idx >= n:
+                    break
+                chunk_path = tmpdir / f"chunk_{i}.fasta"
+                with open(chunk_path, "w") as f:
+                    for seq in list(seqs)[idx:end]:
+                        ts = seq.textize()
+                        f.write(f">{ts.name}\n{ts.sequence}\n")
+                chunk_paths.append(chunk_path)
+                idx = end
+
+            worker_args = [(str(p), str(hmm_dir), mode) for p in chunk_paths]
+
+            t0 = time.perf_counter()
+            with Pool(len(chunk_paths)) as pool:
+                chunk_results = pool.map(_worker_delimit, worker_args)
+            elapsed = time.perf_counter() - t0
+
+        total_detected = sum(r[1] for r in chunk_results)
+        total_full = sum(r[2] for r in chunk_results)
+
     return {
         "tool": f"pyitsx ({mode})",
         "n_sequences": n,
         "elapsed_seconds": round(elapsed, 3),
         "seqs_per_second": round(n / elapsed, 1),
-        "detected": len(detected),
-        "full_chains": full,
-        "partial_chains": len(detected) - full,
+        "detected": total_detected,
+        "full_chains": total_full,
+        "partial_chains": total_detected - total_full,
         "cpus": cpus,
     }
 
@@ -105,8 +151,9 @@ def bench_itsxrust(input_path: Path, hmm_path: Path, cpus: int, max_seqs: int = 
             fmt = "fasta" if input_path.suffix in (".fasta", ".fa", ".fna") else "fastq"
             n = sum(1 for _ in SeqIO.parse(input_path, fmt))
 
+        itsxrust_bin = shutil.which("itsxrust") or str(Path.home() / ".local" / "bin" / "itsxrust")
         cmd = [
-            "itsxrust", "extract",
+            itsxrust_bin, "extract",
             "-i", str(input_path), "--hmm", str(hmm_path),
             "-o", str(tmpdir / "out"), "--region", "all",
             "--preset", "ont", "--hmmer-cpu", str(cpus),
