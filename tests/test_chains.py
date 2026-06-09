@@ -210,10 +210,12 @@ class TestBuildChainPartial:
         chain = build_chain(hits, CONSTRAINTS)
         assert chain is None
 
-    def test_single_s58_anchor_no_chain(self):
+    def test_single_s58_anchor_builds_partial_chain(self):
         hits = [_hit(AnchorType.S58_START, 100, 150, score=100)]
         chain = build_chain(hits, CONSTRAINTS)
-        assert chain is None
+        assert chain is not None
+        assert chain.confidence == Confidence.PARTIAL
+        assert chain.n_anchors == 1
 
 
 class TestConfidence:

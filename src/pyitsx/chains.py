@@ -151,23 +151,26 @@ def _best_single_anchor_chain(
     strand: Strand,
     constraints: ChainConstraints,
 ) -> Optional[AnchorChain]:
-    for anchor_type in (AnchorType.SSU_END, AnchorType.LSU_START):
+    best: Optional[AnchorChain] = None
+    for anchor_type in AnchorType:
         candidates = grouped.get((strand, anchor_type), [])
         if not candidates:
             continue
-        best_hit = candidates[0]
-        if (best_hit.score < constraints.min_anchor_score
-                or best_hit.evalue > constraints.max_anchor_evalue):
+        hit = candidates[0]
+        if (hit.score < constraints.min_anchor_score
+                or hit.evalue > constraints.max_anchor_evalue):
+            continue
+        if best is not None and hit.score <= best.total_score:
             continue
         anchors = [None, None, None, None]
-        anchors[anchor_type.value - 1] = best_hit
-        return AnchorChain(
+        anchors[anchor_type.value - 1] = hit
+        best = AnchorChain(
             anchors=tuple(anchors),
             strand=strand,
-            total_score=best_hit.score,
+            total_score=hit.score,
             confidence=Confidence.PARTIAL,
         )
-    return None
+    return best
 
 
 def detect_chimera(
