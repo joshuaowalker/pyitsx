@@ -49,6 +49,23 @@ results = pyitsx.score_organisms("reads.fasta")
 
 All pipeline functions accept flexible input: file paths, `(name, sequence)` tuples, bare sequence strings, BioPython SeqRecords, or pyhmmer DigitalSequenceBlocks.
 
+### Parallelism
+
+The library API is single-process by design. For parallel workloads, split your input into chunks and process each in a separate process with its own `ProfileDB`. pyhmmer releases the GIL during HMM search, but the short-circuit bookkeeping is Python-level, so `multiprocessing` scales better than threading:
+
+```python
+from multiprocessing import Pool
+from pyitsx import ProfileDB, delimit
+
+def worker(chunk_path):
+    db = ProfileDB(organism="F")
+    seqs = db.load_sequences(chunk_path)
+    return delimit(seqs, db)
+
+with Pool(4) as pool:
+    results = pool.map(worker, chunk_paths)
+```
+
 ## CLI
 
 ```bash
@@ -60,6 +77,22 @@ pyitsx score    -i reads.fasta --organisms F T M
 ```
 
 Use `--format jsonl` for machine-readable output, `--mode best` for exhaustive (non-short-circuit) search.
+
+## Performance
+
+Benchmarked on 803 fungal ITS sequences (Oxford Nanopore, organism group F) on an Apple M-series Mac. All tools use the same ITSx v1.1.3 HMM profiles.
+
+| Tool | cpus | Speed | Detected | vs ITSx |
+|------|------|-------|----------|---------|
+| pyitsx FAST | 1 | 1,516 seq/s | 803/803 | 303x |
+| pyitsx FAST | 4 | 2,953 seq/s | 803/803 | 591x |
+| pyitsx BEST | 4 | 51.9 seq/s | 803/803 | 10x |
+| ITSxRust v0.2.2 | 4 | 48.4 seq/s | 801/803 | 10x |
+| ITSx v1.1.3 | 4 | 5.0 seq/s | 803/803 | 1x |
+
+On a larger dataset (103K reference sequences, 4 cpus), pyitsx FAST mode processes ~1,600 seq/s.
+
+FAST mode achieves its speedup by short-circuiting the profile search — once a confident anchor hit is found, remaining profiles are skipped. BEST mode searches all profiles exhaustively and produces identical boundaries to FAST on all tested datasets.
 
 ## How it works
 
