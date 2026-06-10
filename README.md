@@ -101,4 +101,4 @@ pyitsx builds on the work of several projects:
 
 ## License
 
-MIT
+BSD-3-Clause
