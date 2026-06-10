@@ -13,6 +13,7 @@ htmlcov/
 .ruff_cache/
 .venv/
 venv/
+dev/
 CLAUDE.md
 
 # Don't track the reference papers or ITSx source
