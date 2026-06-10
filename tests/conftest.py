@@ -7,7 +7,7 @@ from pathlib import Path
 from pyitsx.profiles import find_hmm_dir
 
 
-DATA_DIR = Path(os.environ.get("PYITSX_TEST_DATA", Path.home() / "mm" / "data"))
+DATA_DIR = Path(os.environ["PYITSX_TEST_DATA"]) if "PYITSX_TEST_DATA" in os.environ else None
 
 
 def _resolve_hmm_db() -> Path:
@@ -27,7 +27,7 @@ ITSX_DB = _resolve_hmm_db()
 
 
 def _has_test_data():
-    return DATA_DIR.exists()
+    return DATA_DIR is not None and DATA_DIR.exists()
 
 
 def _has_hmm_db():
@@ -59,6 +59,8 @@ def fungi_hmm_path(hmm_db_path) -> Path:
 @pytest.fixture(scope="session")
 def consensus_fasta() -> Path:
     """Path to consensus ITS sequences (verified.fasta from ont98)."""
+    if DATA_DIR is None:
+        pytest.skip("PYITSX_TEST_DATA not set")
     path = DATA_DIR / "ont98" / "data" / "verified.fasta"
     if not path.exists():
         pytest.skip(f"Consensus test data not found at {path}")
@@ -68,6 +70,8 @@ def consensus_fasta() -> Path:
 @pytest.fixture(scope="session")
 def nanopore_fastq() -> Path:
     """Path to raw nanopore ITS reads (all25k.fastq from ont98)."""
+    if DATA_DIR is None:
+        pytest.skip("PYITSX_TEST_DATA not set")
     path = DATA_DIR / "ont98" / "scale-test" / "all25k.fastq"
     if not path.exists():
         pytest.skip(f"Nanopore test data not found at {path}")
@@ -77,6 +81,8 @@ def nanopore_fastq() -> Path:
 @pytest.fixture(scope="session")
 def non_its_data_dir() -> Path:
     """Path to non-ITS data directory (ont_chants RPB2/TEF1 reads)."""
+    if DATA_DIR is None:
+        pytest.skip("PYITSX_TEST_DATA not set")
     path = DATA_DIR / "ont_chants" / "demux0130"
     if not path.exists():
         pytest.skip(f"Non-ITS test data not found at {path}")
