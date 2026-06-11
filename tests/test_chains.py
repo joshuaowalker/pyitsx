@@ -96,6 +96,29 @@ class TestBuildChainFull:
         assert chain.strand == Strand.MINUS
         assert chain.total_score == 240.0
 
+    def test_minus_strand_full_chain(self):
+        """Minus-strand hits have descending coords (env_from > env_to).
+        With seq_length, build_chain normalizes to revcomp frame."""
+        seq_length = 835
+        hits = [
+            _hit(AnchorType.SSU_END, 788, 744, strand=Strand.MINUS),
+            _hit(AnchorType.S58_START, 486, 443, strand=Strand.MINUS),
+            _hit(AnchorType.S58_END, 373, 329, strand=Strand.MINUS),
+            _hit(AnchorType.LSU_START, 109, 65, strand=Strand.MINUS),
+        ]
+        chain = build_chain(hits, CONSTRAINTS, seq_length=seq_length)
+
+        assert chain is not None
+        assert chain.is_full
+        assert chain.n_anchors == 4
+        assert chain.strand == Strand.MINUS
+        for i in range(3):
+            a, b = chain.anchors[i], chain.anchors[i + 1]
+            assert a.env_to < b.env_from, (
+                f"anchors[{i}].env_to={a.env_to} should be < "
+                f"anchors[{i+1}].env_from={b.env_from}"
+            )
+
     def test_rejects_wrong_anchor_order(self):
         hits = [
             _hit(AnchorType.SSU_END, 400, 450),
@@ -166,6 +189,22 @@ class TestBuildChainPartial:
         assert chain.anchors[1] is not None  # S58_START
         assert chain.anchors[2] is None
         assert chain.anchors[3] is None
+
+    def test_partial_its1_minus_strand(self):
+        seq_length = 835
+        hits = [
+            _hit(AnchorType.SSU_END, 788, 744, score=40, strand=Strand.MINUS),
+            _hit(AnchorType.S58_START, 486, 443, score=40, strand=Strand.MINUS),
+        ]
+        chain = build_chain(hits, CONSTRAINTS, seq_length=seq_length)
+
+        assert chain is not None
+        assert chain.confidence == Confidence.PARTIAL
+        assert chain.n_anchors == 2
+        assert chain.strand == Strand.MINUS
+        assert chain.anchors[0] is not None  # SSU_END
+        assert chain.anchors[1] is not None  # S58_START
+        assert chain.anchors[0].env_to < chain.anchors[1].env_from
 
     def test_partial_its2(self):
         hits = [

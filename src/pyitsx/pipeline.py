@@ -61,10 +61,10 @@ def classify(
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
     results_by_id: dict[str, ClassifyResult] = {}
     for seq_id, hits in hits_by_seq.items():
-        chain = build_chain(hits, constraints)
+        seq_length = seq_lengths.get(seq_id, 0)
+        chain = build_chain(hits, constraints, seq_length=seq_length)
         if chain is None:
             continue
-        seq_length = seq_lengths.get(seq_id, 0)
         bounds = extract_regions(chain, seq_length)
         region_set = {b.region for b in bounds}
         results_by_id[seq_id] = ClassifyResult(
@@ -104,10 +104,10 @@ def delimit(
     hits_by_seq = db.search(seqs, cpus=cpus, batch_size=batch_size, mode=mode)
     results_by_id: dict[str, DelimitResult] = {}
     for seq_id, hits in hits_by_seq.items():
-        chain = build_chain(hits, constraints)
+        seq_length = seq_lengths.get(seq_id, 0)
+        chain = build_chain(hits, constraints, seq_length=seq_length)
         if chain is None:
             continue
-        seq_length = seq_lengths.get(seq_id, 0)
         bounds = extract_regions(chain, seq_length)
         results_by_id[seq_id] = DelimitResult(
             seq_id=seq_id,

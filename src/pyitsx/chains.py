@@ -6,13 +6,36 @@ from pyitsx.constants import AnchorType, Confidence, Strand
 from pyitsx.models import AnchorChain, AnchorHit, ChainConstraints, DEFAULT_CONSTRAINTS
 
 
+def _normalize_minus_hits(
+    hits: list[AnchorHit], seq_length: int
+) -> list[AnchorHit]:
+    out = []
+    for h in hits:
+        if h.strand == Strand.MINUS:
+            h = AnchorHit(
+                anchor_type=h.anchor_type,
+                strand=h.strand,
+                env_from=seq_length - h.env_to + 1,
+                env_to=seq_length - h.env_from + 1,
+                score=h.score,
+                evalue=h.evalue,
+                profile_name=h.profile_name,
+            )
+        out.append(h)
+    return out
+
+
 def build_chain(
     hits: list[AnchorHit],
     constraints: ChainConstraints = DEFAULT_CONSTRAINTS,
     max_per_anchor: int = 8,
+    seq_length: int = 0,
 ) -> Optional[AnchorChain]:
     if not hits:
         return None
+
+    if seq_length > 0:
+        hits = _normalize_minus_hits(hits, seq_length)
 
     grouped = _group_hits(hits, max_per_anchor)
 
