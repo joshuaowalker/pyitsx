@@ -366,6 +366,26 @@ def _seed_profile_freq(
                 freq[name] = n - i
 
 
+def is_available(
+    organism: Union[Organism, str] = Organism.F,
+    hmm_dir: Optional[Path] = None,
+) -> bool:
+    """Check whether pyitsx can run for the given organism group.
+
+    Returns True if the HMM directory is locatable and contains profiles
+    for the requested organism. Returns False on any failure.
+    """
+    try:
+        if isinstance(organism, str):
+            organism = Organism.from_code(organism)
+        if hmm_dir is None:
+            hmm_dir = find_hmm_dir()
+        hmm_path = Path(hmm_dir) / f"{organism.name}.hmm"
+        return hmm_path.exists()
+    except (FileNotFoundError, ValueError):
+        return False
+
+
 def find_hmm_dir() -> Path:
     """Auto-detect the ITSx HMM profile directory.
 

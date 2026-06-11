@@ -108,6 +108,8 @@ pyitsx uses the same biological model as ITSx — profile-HMM search against con
 
 **Use-case oriented API.** The Python API exposes `orient`, `classify`, `delimit`, and `extract` as separate functions with typed result objects, rather than a single monolithic entry point. Pipeline functions accept file paths, bare strings, `(name, sequence)` tuples, BioPython SeqRecords, or pyhmmer DigitalSequenceBlocks.
 
+**Chain-based chimera detection.** pyitsx flags two types of chimeric sequences: out-of-order anchors on the dominant strand (e.g., LSU before SSU), and cross-strand chimeras where significant hits on the minor strand fall outside the dominant strand's chain span. The cross-strand check uses structural evidence — a reverse-oriented fragment ligated to one end of an otherwise well-formed chain — rather than simple score thresholds. Minor-strand hits that fall *inside* the dominant chain span are ignored as background reverse-complement similarity. This eliminates false positives from the ~40% baseline sequence identity between rRNA regions and their reverse complements. On a 103K fungal reference dataset, this approach produces zero false positives while detecting 97 true chimeras validated by same-taxon alignment.
+
 **Process-level parallelism.** The CLI splits input sequences into chunks and processes them in independent worker processes (`--cpus`). Each worker loads its own HMM profiles and runs single-threaded short-circuit search. This avoids GIL contention and scales near-linearly to 4+ cores. The library API is intentionally single-process — parallelization is left to user code, where workload and resource constraints are understood.
 
 ## Caveats

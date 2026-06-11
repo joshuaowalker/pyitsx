@@ -14,7 +14,7 @@ from pyitsx.models import (
     RegionBounds,
 )
 from pyitsx.pipeline import classify, delimit, extract, orient
-from pyitsx.profiles import ProfileDB, find_hmm_dir
+from pyitsx.profiles import ProfileDB, find_hmm_dir, is_available
 from pyitsx.scoring import score_organisms
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     "extract",
     "ExtractionResult",
     "find_hmm_dir",
+    "is_available",
     "DelimitResult",
     "Organism",
     "OrganismResult",

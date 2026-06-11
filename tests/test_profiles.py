@@ -2,7 +2,7 @@ import pytest
 from collections import Counter
 
 from pyitsx.constants import AnchorType, Organism, Strand
-from pyitsx.profiles import ProfileDB, find_hmm_dir
+from pyitsx.profiles import ProfileDB, find_hmm_dir, is_available
 from tests.conftest import requires_hmm_db, ITSX_DB
 
 
@@ -108,3 +108,31 @@ class TestFindHmmDir:
             pytest.skip("ITSx not installed")
         db = ProfileDB(organism="F")
         assert db.n_profiles > 0
+
+
+class TestIsAvailable:
+
+    def test_available_with_real_itsx(self):
+        import shutil
+        if not shutil.which("ITSx"):
+            pytest.skip("ITSx not installed")
+        assert is_available("F") is True
+
+    def test_available_with_explicit_dir(self):
+        import shutil
+        if not shutil.which("ITSx"):
+            pytest.skip("ITSx not installed")
+        hmm_dir = find_hmm_dir()
+        assert is_available("F", hmm_dir=hmm_dir) is True
+
+    def test_unavailable_bad_organism(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PYITSX_HMM_DIR", str(tmp_path))
+        assert is_available("F") is False
+
+    def test_unavailable_no_hmm_dir(self, monkeypatch):
+        monkeypatch.delenv("PYITSX_HMM_DIR", raising=False)
+        monkeypatch.setenv("PATH", "/nonexistent")
+        assert is_available("F") is False
+
+    def test_unavailable_invalid_organism_code(self):
+        assert is_available("Z") is False
