@@ -15,8 +15,8 @@ def _normalize_minus_hits(
             h = AnchorHit(
                 anchor_type=h.anchor_type,
                 strand=h.strand,
-                env_from=seq_length - h.env_to + 1,
-                env_to=seq_length - h.env_from + 1,
+                env_from=seq_length - h.env_from + 1,
+                env_to=seq_length - h.env_to + 1,
                 score=h.score,
                 evalue=h.evalue,
                 profile_name=h.profile_name,

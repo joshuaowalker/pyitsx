@@ -124,6 +124,10 @@ class TestBuildChainFull:
                 f"anchors[{i}].env_to={a.env_to} should be < "
                 f"anchors[{i+1}].env_from={b.env_from}"
             )
+        for a in chain.anchors:
+            assert a.env_from < a.env_to, (
+                f"{a.anchor_type.name}: env_from={a.env_from} should be < env_to={a.env_to}"
+            )
 
     def test_rejects_wrong_anchor_order(self):
         hits = [
