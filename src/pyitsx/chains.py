@@ -34,7 +34,12 @@ def build_chain(
     if not hits:
         return None
 
-    if seq_length > 0:
+    has_minus = any(h.strand == Strand.MINUS for h in hits)
+    if has_minus and seq_length <= 0:
+        raise ValueError(
+            "seq_length is required when hits contain minus-strand entries"
+        )
+    if has_minus:
         hits = _normalize_minus_hits(hits, seq_length)
 
     grouped = _group_hits(hits, max_per_anchor)

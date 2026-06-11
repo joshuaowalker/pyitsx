@@ -217,6 +217,10 @@ class ProfileDB:
         batch_size: int = DEFAULT_BATCH_SIZE,
         mode: SearchMode = SearchMode.FAST,
     ) -> dict[str, list[AnchorHit]]:
+        # In FAST mode, sequences with duplicate names share short-circuit
+        # state: a hit on one satisfies the other, which may then miss its
+        # best-matching profile.  Callers with non-unique IDs should use
+        # SearchMode.BEST or deduplicate before searching.
         hits_by_seq: dict[str, list[AnchorHit]] = defaultdict(list)
         batches = _make_batches(sequences, max(batch_size, 1), self._alphabet)
 

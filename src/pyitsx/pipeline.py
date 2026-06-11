@@ -42,7 +42,7 @@ def orient(
         if seq_id in results_by_id:
             results.extend([results_by_id[seq_id]] * n)
         else:
-            undetected = OrientResult(seq_id=seq_id, strand=None, top_score=0.0, n_anchors=0)
+            undetected = OrientResult(seq_id=seq_id, strand=None, top_score=0.0, n_hits=0)
             results.extend([undetected] * n)
     return results
 
@@ -209,6 +209,6 @@ def _orient_from_hits(
         seq_id=seq_id,
         strand=best_strand,
         top_score=top_score_by_strand[best_strand],
-        n_anchors=count_by_strand[best_strand],
+        n_hits=count_by_strand[best_strand],
         chimeric=detect_chimera(hits),
     )

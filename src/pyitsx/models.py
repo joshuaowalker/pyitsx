@@ -20,7 +20,7 @@ class OrientResult:
     seq_id: str
     strand: Optional[Strand]
     top_score: float
-    n_anchors: int
+    n_hits: int
     chimeric: bool = False
 
 

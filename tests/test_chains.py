@@ -88,9 +88,15 @@ class TestBuildChainFull:
         assert chain.confidence == Confidence.CONFIDENT
 
     def test_selects_higher_scoring_strand(self):
+        seq_length = 800
         plus_hits = self._four_anchors(Strand.PLUS, scores=(40, 40, 40, 40))
-        minus_hits = self._four_anchors(Strand.MINUS, scores=(60, 60, 60, 60))
-        chain = build_chain(plus_hits + minus_hits, CONSTRAINTS)
+        minus_hits = [
+            _hit(AnchorType.SSU_END, 790, 746, score=60, strand=Strand.MINUS),
+            _hit(AnchorType.S58_START, 483, 439, score=60, strand=Strand.MINUS),
+            _hit(AnchorType.S58_END, 370, 326, score=60, strand=Strand.MINUS),
+            _hit(AnchorType.LSU_START, 128, 76, score=60, strand=Strand.MINUS),
+        ]
+        chain = build_chain(plus_hits + minus_hits, CONSTRAINTS, seq_length=seq_length)
 
         assert chain is not None
         assert chain.strand == Strand.MINUS

@@ -21,7 +21,7 @@ class TestOrient:
             assert isinstance(r, OrientResult)
             assert isinstance(r.strand, Strand)
             assert r.top_score > 0
-            assert r.n_anchors > 0
+            assert r.n_hits > 0
 
     def test_orient_mostly_plus_strand(self, itsx_test_fasta):
         db = ProfileDB(ITSX_DB, organism="F")
@@ -37,7 +37,7 @@ class TestOrient:
         assert len(results) == 1
         assert results[0].strand is None
         assert results[0].top_score == 0.0
-        assert results[0].n_anchors == 0
+        assert results[0].n_hits == 0
 
 
 @requires_hmm_db

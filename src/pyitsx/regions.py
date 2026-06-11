@@ -42,7 +42,7 @@ def extract_regions(
     elif a4 is not None and a3 is None and a2 is None and a1 is None and a4.env_from > 1:
         bounds.append(RegionBounds(Region.ITS2, 1, a4.env_from - 1))
 
-    if a4 is not None:
+    if a4 is not None and a4.env_from <= seq_length:
         bounds.append(RegionBounds(Region.LSU, a4.env_from, seq_length))
 
     return tuple(bounds)

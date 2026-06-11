@@ -231,7 +231,7 @@ def _run_parallel(args, cpus, mode, out):
 
 
 _TSV_HEADERS = {
-    "orient": "seq_id\tstrand\ttop_score\tn_anchors\tchimeric\n",
+    "orient": "seq_id\tstrand\ttop_score\tn_hits\tchimeric\n",
     "classify": "seq_id\tstrand\thas_its1\thas_its2\tconfidence\tchimeric\n",
     "delimit": "seq_id\tseq_length\tstrand\tconfidence\tchimeric\tSSU\tITS1\t5.8S\tITS2\tLSU\tfull_ITS\n",
 }
@@ -246,14 +246,14 @@ def _write_header(command, out):
 def _write_orient(results, out, fmt, header=True):
     if fmt == "jsonl":
         for r in results:
-            json.dump({"seq_id": r.seq_id, "strand": r.strand.value if r.strand else "-", "top_score": r.top_score, "n_anchors": r.n_anchors, "chimeric": r.chimeric}, out)
+            json.dump({"seq_id": r.seq_id, "strand": r.strand.value if r.strand else "-", "top_score": r.top_score, "n_hits": r.n_hits, "chimeric": r.chimeric}, out)
             out.write("\n")
     else:
         if header:
             out.write(_TSV_HEADERS["orient"])
         for r in results:
             strand = r.strand.value if r.strand else "-"
-            out.write(f"{r.seq_id}\t{strand}\t{r.top_score:.1f}\t{r.n_anchors}\t{r.chimeric}\n")
+            out.write(f"{r.seq_id}\t{strand}\t{r.top_score:.1f}\t{r.n_hits}\t{r.chimeric}\n")
 
 
 def _write_classify(results, out, fmt, header=True):
