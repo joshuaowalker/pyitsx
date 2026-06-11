@@ -195,8 +195,12 @@ def detect_chimera(
 
     ordered = sorted(best_by_anchor.values(), key=lambda h: h.anchor_type.value)
     for i in range(len(ordered) - 1):
-        if ordered[i].env_to >= ordered[i + 1].env_from:
-            return True
+        if dominant == Strand.PLUS:
+            if max(ordered[i].env_from, ordered[i].env_to) >= min(ordered[i + 1].env_from, ordered[i + 1].env_to):
+                return True
+        else:
+            if min(ordered[i].env_from, ordered[i].env_to) <= max(ordered[i + 1].env_from, ordered[i + 1].env_to):
+                return True
 
     return False
 

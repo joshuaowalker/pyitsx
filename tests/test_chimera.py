@@ -67,6 +67,24 @@ class TestDetectChimera:
         ]
         assert detect_chimera(hits) is False
 
+    def test_normal_minus_strand_not_chimeric(self):
+        hits = [
+            _hit(AnchorType.SSU_END, 788, 744, strand=Strand.MINUS),
+            _hit(AnchorType.S58_START, 486, 443, strand=Strand.MINUS),
+            _hit(AnchorType.S58_END, 373, 329, strand=Strand.MINUS),
+            _hit(AnchorType.LSU_START, 109, 65, strand=Strand.MINUS),
+        ]
+        assert detect_chimera(hits) is False
+
+    def test_out_of_order_minus_strand_chimera(self):
+        hits = [
+            _hit(AnchorType.SSU_END, 200, 150, strand=Strand.MINUS),
+            _hit(AnchorType.S58_START, 600, 550, strand=Strand.MINUS),
+            _hit(AnchorType.S58_END, 373, 329, strand=Strand.MINUS),
+            _hit(AnchorType.LSU_START, 109, 65, strand=Strand.MINUS),
+        ]
+        assert detect_chimera(hits) is True
+
     def test_all_below_threshold_not_chimeric(self):
         hits = [
             _hit(AnchorType.SSU_END, 10, 50, score=5.0),
