@@ -226,6 +226,20 @@ class TestBuildChainPartial:
         assert chain.anchors[2] is not None  # S58_END
         assert chain.anchors[3] is not None  # LSU_START
 
+    def test_ssu_lsu_only_falls_to_single_anchor(self):
+        """SSU_END + LSU_START without 5.8S cannot delimit any ITS region,
+        so it should not form a partial chain."""
+        hits = [
+            _hit(AnchorType.SSU_END, 10, 54, score=40),
+            _hit(AnchorType.LSU_START, 672, 724, score=60),
+        ]
+        chain = build_chain(hits, CONSTRAINTS)
+
+        assert chain is not None
+        assert chain.n_anchors == 1
+        assert chain.anchors[3] is not None  # LSU_START (higher score)
+        assert chain.anchors[0] is None
+
     def test_full_chain_preferred_over_partial(self):
         full_hits = [
             _hit(AnchorType.SSU_END, 10, 54, score=30),
