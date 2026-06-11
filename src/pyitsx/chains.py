@@ -200,22 +200,51 @@ def _best_single_anchor_chain(
     return best
 
 
+def _hit_left(h: AnchorHit) -> int:
+    return min(h.env_from, h.env_to)
+
+
+def _hit_right(h: AnchorHit) -> int:
+    return max(h.env_from, h.env_to)
+
+
 def detect_chimera(
     hits: list[AnchorHit],
     score_threshold: float = 20.0,
+    min_cross_strand_hits: int = 1,
 ) -> bool:
     if not hits:
         return False
 
-    plus_score = sum(h.score for h in hits if h.strand == Strand.PLUS and h.score >= score_threshold)
-    minus_score = sum(h.score for h in hits if h.strand == Strand.MINUS and h.score >= score_threshold)
-    if plus_score >= score_threshold and minus_score >= score_threshold:
-        return True
+    significant = [h for h in hits if h.score >= score_threshold]
+    if not significant:
+        return False
+
+    plus_hits = [h for h in significant if h.strand == Strand.PLUS]
+    minus_hits = [h for h in significant if h.strand == Strand.MINUS]
+    plus_score = sum(h.score for h in plus_hits)
+    minus_score = sum(h.score for h in minus_hits)
+
+    if plus_hits and minus_hits:
+        if plus_score >= minus_score:
+            dominant_hits, minor_hits = plus_hits, minus_hits
+        else:
+            dominant_hits, minor_hits = minus_hits, plus_hits
+
+        dom_left = min(_hit_left(h) for h in dominant_hits)
+        dom_right = max(_hit_right(h) for h in dominant_hits)
+
+        n_outside = sum(
+            1 for h in minor_hits
+            if _hit_right(h) < dom_left or _hit_left(h) > dom_right
+        )
+        if n_outside >= min_cross_strand_hits:
+            return True
 
     dominant = Strand.PLUS if plus_score >= minus_score else Strand.MINUS
     best_by_anchor: dict[AnchorType, AnchorHit] = {}
-    for h in hits:
-        if h.strand != dominant or h.score < score_threshold:
+    for h in significant:
+        if h.strand != dominant:
             continue
         if h.anchor_type not in best_by_anchor or h.score > best_by_anchor[h.anchor_type].score:
             best_by_anchor[h.anchor_type] = h
@@ -223,10 +252,10 @@ def detect_chimera(
     ordered = sorted(best_by_anchor.values(), key=lambda h: h.anchor_type.value)
     for i in range(len(ordered) - 1):
         if dominant == Strand.PLUS:
-            if max(ordered[i].env_from, ordered[i].env_to) >= min(ordered[i + 1].env_from, ordered[i + 1].env_to):
+            if _hit_right(ordered[i]) >= _hit_left(ordered[i + 1]):
                 return True
         else:
-            if min(ordered[i].env_from, ordered[i].env_to) <= max(ordered[i + 1].env_from, ordered[i + 1].env_to):
+            if _hit_left(ordered[i]) <= _hit_right(ordered[i + 1]):
                 return True
 
     return False
