@@ -82,14 +82,18 @@ Use `--format jsonl` for machine-readable output, `--mode best` for exhaustive (
 
 Benchmarked on 803 fungal ITS sequences (Oxford Nanopore, organism group F) on an Apple M-series Mac. All tools use the same ITSx v1.1.3 HMM profiles.
 
-| Tool | cpus | Speed | Detected | vs ITSx |
-|------|------|-------|----------|---------|
-| pyitsx FAST | 1 | 1,543 seq/s | 803/803 | 302x |
-| pyitsx BEST | 1 | 15.6 seq/s | 803/803 | 3x |
-| ITSxRust v0.2.2 | 1 | 27.1 seq/s | 801/803 | 5x |
-| ITSx v1.1.3 | 1 | 5.1 seq/s | 803/803 | 1x |
+| Tool | cpus | batch | Speed | Detected | vs ITSx |
+|------|------|-------|-------|----------|---------|
+| pyitsx FAST | 1 | 1 | 1,543 seq/s | 803/803 | 302x |
+| pyitsx BEST | 1 | 64 | 23.7 seq/s | 803/803 | 5x |
+| ITSxRust v0.2.2 | 1 | — | 27.1 seq/s | 801/803 | 5x |
+| ITSx v1.1.3 | 1 | — | 5.1 seq/s | 803/803 | 1x |
 
 FAST mode achieves its speedup by short-circuiting the profile search — once a confident anchor hit is found, remaining profiles are skipped. BEST mode searches all profiles exhaustively and produces identical boundaries to FAST on all tested datasets.
+
+### Batch size
+
+The `--batch-size` flag controls how many sequences are searched per pyhmmer call. FAST mode defaults to 1 (required for per-sequence short-circuiting). BEST mode defaults to 64, which amortizes pyhmmer's per-call overhead since all profiles are searched regardless. Larger values (up to 256) give marginal further improvement in BEST mode.
 
 ## How it works
 

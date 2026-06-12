@@ -38,7 +38,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Organism group code (default: F for fungi)",
     )
     shared.add_argument("--cpus", type=int, default=1, help="Worker processes for parallel search (default: 1)")
-    shared.add_argument("--batch-size", type=int, default=1, help="Sequences per search batch (default: 1)")
+    shared.add_argument("--batch-size", type=int, default=None, help="Sequences per search batch (default: 1 for fast, 64 for best)")
     shared.add_argument("--format", choices=["tsv", "jsonl"], default="tsv", help="Output format")
     shared.add_argument("--mode", choices=["fast", "best"], default="fast", help="Search mode: fast (short-circuit) or best (exhaustive)")
 
@@ -142,6 +142,8 @@ def main(argv: list[str] | None = None) -> None:
 
     cpus = _resolve_cpus(args.cpus)
     mode = SearchMode(args.mode)
+    if args.batch_size is None:
+        args.batch_size = 64 if mode == SearchMode.BEST else 1
     out = open(args.output, "w") if args.output else sys.stdout
 
     try:
